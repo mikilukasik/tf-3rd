@@ -5,7 +5,7 @@ const fs = require('fs').promises;
 const path = require('path');
 
 const folderName = 'otb_2000+_chkmt/2000+chkmt';
-const maxSampleSize = 10000;
+const maxSampleSize = 2500000;
 
 const numOfClasses = 1;
 
@@ -13,8 +13,8 @@ const imageWidth = 8;
 const imageHeight = 8;
 const imageChannels = 7;
 
-const batchSize = 500;
-const epochsValue = 30;
+const batchSize = 1000;
+const epochsValue = 400;
 
 // Define the model architecture
 const buildModel = function () {
@@ -51,7 +51,7 @@ const buildModel = function () {
 
   model.add(
     tf.layers.conv2d({
-      filters: 128,
+      filters: 64,
       kernelSize: 8,
       padding: 'same',
       activation: 'sigmoid',
@@ -75,12 +75,12 @@ const buildModel = function () {
     }),
   );
 
-  model.add(
-    tf.layers.dense({
-      units: 32,
-      activation: 'sigmoid',
-    }),
-  );
+  // model.add(
+  //   tf.layers.dense({
+  //     units: 64,
+  //     activation: 'sigmoid',
+  //   }),
+  // );
 
   model.add(
     tf.layers.dense({
