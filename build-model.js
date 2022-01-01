@@ -145,7 +145,7 @@ const trainModel = async function (model, trainingData, epochs = epochsValue) {
       new tf.CustomCallback({
         onEpochBegin: async (epoch) => {
           console.log(`Epoch ${epoch + 1} of ${epochs} ...`);
-          if (!started) started = Date.now();
+          if (!started && epoch > 0) started = Date.now();
         },
       }),
       new tf.CustomCallback({
@@ -154,10 +154,17 @@ const trainModel = async function (model, trainingData, epochs = epochsValue) {
           // console.log(`  train-set loss: ${logs.loss.toFixed(4)}`);
           // console.log(`  train-set accuracy: ${logs.acc.toFixed(4)}`)
           const elapsed = Date.now() - started;
-          const msPerIteration = elapsed / (epoch + 1);
-          const speed = `${((60 * 60 * 1000) / msPerIteration).toFixed(1)}/h`;
+
+          let msPerIteration;
+          let speed;
           const remainingIterations = epochsValue - epoch - 1;
-          const remainingHours = ((msPerIteration * remainingIterations) / 1000 / 60 / 60).toFixed(2);
+          let remainingHours;
+
+          if (epoch > 0) {
+            msPerIteration = elapsed / epoch;
+            speed = `${((60 * 60 * 1000) / msPerIteration).toFixed(1)}/h`;
+            remainingHours = ((msPerIteration * remainingIterations) / 1000 / 60 / 60).toFixed(2);
+          }
 
           //  lastLog = { lessonType, lessonName, error, iterations, speed };
           console.log({
