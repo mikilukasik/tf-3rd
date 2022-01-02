@@ -1,15 +1,64 @@
 const fs = require('fs').promises;
 const path = require('path');
-const { getStockfishScore } = require('./stockfish_worker.js');
+const { getStockfishEvalScore, getStockfishSearchScore } = require('./stockfish_worker.js');
 
-// const encoder = new TextEncoder();
+const expandGroupedBlanks = (rowStr) => {
+  let result = rowStr;
+  for (const char of rowStr) if (Number(char)) result = result.replace(char, '1'.repeat(Number(char)));
+  return result;
+};
 
-const processMoveLines = async ({ moveLines, fileName }) => {
-  // const totalMoves = moveLines.length;
-  // return moveLines.map(([moveIndex, line]) => {
+const getFilledArray = () =>
+  Array(8)
+    .fill(0)
+    .map((e, i) => i);
 
-  // })
+const getEnPassantTarget = ({ fen1, fen2, whitesMove }) => {
+  const pawnChar = whitesMove ? 'P' : 'p';
+
+  const splitFen1 = fen1.split('/');
+  const splitFen2 = fen2.split('/');
+  const fen1SourceRow = expandGroupedBlanks(splitFen1[whitesMove ? 6 : 1]);
+  const fen1TargetRow = expandGroupedBlanks(splitFen1[whitesMove ? 4 : 3]);
+  const fen2SourceRow = expandGroupedBlanks(splitFen2[whitesMove ? 6 : 1]);
+  const fen2TargetRow = expandGroupedBlanks(splitFen2[whitesMove ? 4 : 3]);
+
+  const { length: foundOne, 0: col } = getFilledArray().filter(
+    (col) =>
+      fen1SourceRow[col] === pawnChar &&
+      fen1TargetRow[col] === '1' &&
+      fen2SourceRow[col] === '1' &&
+      fen2TargetRow[col] === pawnChar,
+  );
+
+  return foundOne ? `${String.fromCharCode(97 + col)}${whitesMove ? '3' : '6'}` : '-';
+};
+
+const processMoveLines = async ({ moveLines, result, fileName }) => {
   const processedMoveLines = [];
+
+  let castlingStr = 'KQkq';
+  const updateCastlingStr = (fenStr) => {
+    const removeLetter = (letter) => (castlingStr = castlingStr.replace(letter, ''));
+
+    let [bRow, , , , , , , wRow] = fenStr.split('/');
+    bRow = expandGroupedBlanks(bRow);
+    wRow = expandGroupedBlanks(wRow);
+
+    if (bRow[0] !== 'r') removeLetter('q');
+    if (bRow[7] !== 'r') removeLetter('k');
+    if (wRow[0] !== 'R') removeLetter('Q');
+    if (wRow[7] !== 'R') removeLetter('K');
+
+    if (bRow[4] !== 'k') {
+      removeLetter('k');
+      removeLetter('q');
+    }
+    if (wRow[4] !== 'K') {
+      removeLetter('K');
+      removeLetter('Q');
+    }
+  };
 
   for (const [moveIndex, line] of moveLines.entries()) {
     const fenStr = `${line.substr(1, line.indexOf(' ') - 1)}`;
@@ -24,115 +73,23 @@ const processMoveLines = async ({ moveLines, fileName }) => {
     }
 
     const wasWhitesMove = moveIndex % 2;
-    // console.log('getting');
-    const stockfishScores = wasWhitesMove
-      ? { bn: Number(await getStockfishScore(`${fenStr} b`)) / 168 + 0.5 }
-      : { wn: Number(await getStockfishScore(`${fenStr} w`)) / 168 + 0.5 };
 
-    // {
-    //   // wn: Number(await getStockfishScore(`${fenStr} w`)),
-    //   // bn: Number(await getStockfishScore(`${fenStr} b`)),
-    //   wn: Number(await getStockfishScore(`${fenStr} w`)) / 168 + 0.5,
-    //   bn: Number(await getStockfishScore(`${fenStr} b`)) / 168 + 0.5,
-    // };
-    // console.log('got', stockfishScores);
-    processedMoveLines.push({ fenStr, stockfishScores });
-    continue;
-    // const progress = moveIndex / (totalMoves - 1);
-    // const projectedWinner = result + 0.5;
-    // const linearScore = result * progress + 0.5
-    // const whiteWillWin = result === 0.5 ? 1 : 0;
-    // const blackWillWin = result === -0.5 ? 1 : 0;
-    // const whiteScore = whiteWillWin * progress;
-    // const blackScore = blackWillWin * progress;
-    // const whiteWon = whiteWillWin && progress === 1 ? 1 : 0;
-    // const blackWon = blackWillWin && progress === 1 ? 1 : 0;
+    updateCastlingStr(fenStr);
+    const ept = getEnPassantTarget({
+      fen1: moveLines[moveIndex - 1],
+      fen2: fenStr,
+      whitesMove: wasWhitesMove,
+    });
 
-    // const endGameScore = Math.pow(progress, 5) * result + 0.5;
-    // const openingScore = Math.pow(progress, 0.5) * result + 0.5;
-    // const midGameScore = ((progress > 0.5 ? Math.pow((progress - 0.5) * 2, 2) : Math.pow(progress * 2, 4) - (progress > 0.5 ? 0 : 1)) / 2 + 0.5) * result + 0.5;
+    const newFen = `${fenStr} ${wasWhitesMove ? 'b' : 'w'} ${castlingStr || '-'} ${ept}`;
+    const stockfishScores = {
+      eval: await getStockfishEvalScore(newFen),
+      search: await getStockfishSearchScore(newFen),
+    };
 
-    // const isCheckMate = progress === 1 ? projectedWinner : 0.5; // only works if all htmls have checkmate on the end
-
-    // const output = [progress, projectedWinner, linearScore, openingScore, midGameScore, endGameScore, isCheckMate];
-    // const output = [linearScore, whiteScore, blackScore, whiteWillWin, blackWillWin, whiteWon, blackWon];
-    // const output = [Number(await getStockfishScore(`${fenStr} ${wasWhitesMove ? 'b' : 'w'}`)) / 168 + 0.5];
-
-    // const resultingInputArray = [wasWhitesMove];
-
-    // // const step = 1 / 12;
-
-    // let tableBalance = 0;
-    // let totalValue = 0;
-
-    // fenStr.split('').forEach((char) => {
-    //   switch (char) {
-    //     case 'p':
-    //       resultingInputArray.push(1, 0.5, 0.5, 0.5, 0.5);
-    //       tableBalance += 1;
-    //       totalValue += 1;
-    //       break;
-    //     case 'b':
-    //       resultingInputArray.push(0.5, 1, 0.5, 0.5, 0.5);
-    //       tableBalance += 3;
-    //       totalValue += 3;
-    //       break;
-    //     case 'n':
-    //       resultingInputArray.push(0.5, 0.5, 1, 0.5, 0.5);
-    //       tableBalance += 3;
-    //       totalValue += 3;
-    //       break;
-    //     case 'r':
-    //       resultingInputArray.push(0.5, 0.5, 0.5, 1, 0.5);
-    //       tableBalance += 5;
-    //       totalValue += 5;
-    //       break;
-    //     case 'q':
-    //       resultingInputArray.push(0.5, 1, 0.5, 1, 0.5);
-    //       tableBalance += 9;
-    //       totalValue += 9;
-    //       break;
-    //     case 'k':
-    //       resultingInputArray.push(0.5, 0.5, 0.5, 0.5, 1);
-    //       break;
-
-    //     case 'P':
-    //       resultingInputArray.push(0, 0.5, 0.5, 0.5, 0.5);
-    //       tableBalance -= 1;
-    //       totalValue += 1;
-    //       break;
-    //     case 'B':
-    //       resultingInputArray.push(0.5, 0, 0.5, 0.5, 0.5);
-    //       tableBalance -= 3;
-    //       totalValue += 3;
-    //       break;
-    //     case 'N':
-    //       resultingInputArray.push(0.5, 0.5, 0, 0.5, 0.5);
-    //       tableBalance -= 3;
-    //       totalValue += 3;
-    //       break;
-    //     case 'R':
-    //       resultingInputArray.push(0.5, 0.5, 0.5, 0, 0.5);
-    //       tableBalance -= 5;
-    //       totalValue += 5;
-    //       break;
-    //     case 'Q':
-    //       resultingInputArray.push(0.5, 0, 0.5, 0, 0.5);
-    //       tableBalance -= 9;
-    //       totalValue += 9;
-    //       break;
-    //     case 'K':
-    //       resultingInputArray.push(0.5, 0.5, 0.5, 0.5, 0);
-    //       break;
-
-    //     case '/':
-    //       break;
-
-    //     default:
-    //       resultingInputArray.push(...Array.from({ length: Number(char) * 5 }).map(() => 0.5));
-    //   }
-    // });
+    processedMoveLines.push({ fenStr: newFen, stockfishScores });
   }
+
   return processedMoveLines;
 };
 
@@ -141,7 +98,6 @@ const getMoveLines = ({ lines }) => {
   const lastMoveLineIndex = lines.findIndex((line) => line.startsWith('var current = 0;'));
 
   return lines.slice(firstMoveLineIndex, lastMoveLineIndex);
-  // .slice(-20) // keep the last 20 steps only, much less noise
 };
 
 const getResult = ({ lines, fileName }) => {
@@ -173,7 +129,7 @@ const processHtml = async ({ htmlContent, fileName }) => {
   const result = getResult({ lines, fileName });
 
   const moveLines = getMoveLines({ lines });
-  const fens = await processMoveLines({ moveLines, fileName });
+  const fens = await processMoveLines({ moveLines, result, fileName });
 
   return { fens, result };
 };
@@ -181,7 +137,7 @@ const processHtml = async ({ htmlContent, fileName }) => {
 const cacheGame = async ({ game, fileName, folderName }) => {
   try {
     const cacheFileName = path.resolve(`cache/${folderName}/${fileName}.json`);
-    fs.mkdir(`cache/${folderName}`, { recursive: true });
+    await fs.mkdir(path.resolve('cache', folderName), { recursive: true });
     return fs.writeFile(cacheFileName, JSON.stringify(game));
   } catch (e) {
     console.error(e);
@@ -207,7 +163,7 @@ const readGames = async ({ folderName, skip = 0, limit = 9999999999 }) => {
 
   // randomizing file order for better samples
   // if (!process.env.KEEP_FILE_ORDER) validFilesArray.sort(() => Math.random() - 0.5);
-  // console.log(skip, typeof skip);
+
   let fileIndex = skip;
   const getNextGame = async () => {
     const fileName = validFilesArray[fileIndex++];
@@ -221,82 +177,6 @@ const readGames = async ({ folderName, skip = 0, limit = 9999999999 }) => {
     await cacheGame({ game, fileName, folderName });
     return { gameIndex: fileIndex - 1, game };
   };
-
-  /*
-
-  for (const [fileIndex, _fileName] of fileArray.entries()) {
-    const now = Date.now();
-    // if (lastLoggedAt < now - 10000) {
-    //   lastLoggedAt = now;
-    //   console.log(`${fileIndex} of ${fileArray.length} files processed.`);
-    // }
-
-    const sourceFileName = path.resolve(sourceDir, _fileName);
-    const stringContent = fs.readFileSync(sourceFileName, 'utf-8');
-    const lines = stringContent.split('\n');
-
-    const resultStr = lines.find((line) => line.startsWith(`<br><class="VH">`)).substr(16);
-    let result;
-    switch (resultStr) {
-      case '1-0':
-        result = 0.5;
-        break;
-
-      case '0-1':
-        result = -0.5;
-        break;
-
-      case '=-=':
-        result = 0;
-        break;
-
-      default:
-        console.warn(`no result in html ${fileName}`, { resultStr });
-        return;
-    }
-
-    const firstMoveLineIndex = lines.findIndex((line) => line === 'movesArray = new Array(') + 1;
-    const lastMoveLineIndex = lines.findIndex((line) => line === 'var current = 0;');
-
-    const moveLines = lines.slice(firstMoveLineIndex, lastMoveLineIndex); //.map((line, index) => ({ line, index })).slice(-50);
-    // .slice(-20) // keep the last 20 steps only, much less noise
-   
-
-      // if (wasWhitesMove) {
-      //   if (destFilesUsed.white) fs.appendFileSync(destFileNameWhite, ',\n', 'utf8');
-      //   destFilesUsed.white = true;
-
-      //   fs.appendFileSync(destFileNameWhite, `  ${JSON.stringify({ input: resultingInputArray, output })}`, 'utf-8');
-      //   continue;
-      // }
-
-      if (destFilesUsed.mix) fs.appendFileSync(destFileName, ',\n', 'utf8');
-      destFilesUsed.mix = true;
-
-      fs.appendFileSync(destFileName, `  ${JSON.stringify({ input: resultingInputArray, output })}`, 'utf-8');
-
-      if (tableBalance === 0 && totalValue < 70) {
-        if (destFilesUsed.eq) fs.appendFileSync(destEqFileName, ',\n', 'utf8');
-        destFilesUsed.eq = true;
-
-        fs.appendFileSync(destEqFileName, `  ${JSON.stringify({ input: resultingInputArray, output })}`, 'utf-8');
-      }
-
-      if (progress > 0.9) {
-        if (destFilesUsed.end) fs.appendFileSync(destEndFileName, ',\n', 'utf8');
-        destFilesUsed.end = true;
-
-        fs.appendFileSync(destEndFileName, `  ${JSON.stringify({ input: resultingInputArray, output })}`, 'utf-8');
-      }
-    }
-  }
-
-
-  */
-
-  // fs.appendFileSync(destEndFileName, `]\n`, 'utf-8');
-  // fs.appendFileSync(destFileName, `]\n`, 'utf-8');
-  // fs.appendFileSync(destEqFileName, `]\n`, 'utf-8');
 
   return {
     getNextGame,

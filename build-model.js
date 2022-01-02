@@ -1,11 +1,11 @@
-const tf = require('@tensorflow/tfjs-node-gpu');
+const tf = require('@tensorflow/tfjs-node');
 const StreamArray = require('stream-json/streamers/StreamArray');
 const { readGames } = require('./src/utils/read-games');
 const fs = require('fs').promises;
 const path = require('path');
 
 const folderName = 'otb_2000+_chkmt/2000+chkmt';
-const maxSampleSize = 2500000;
+const maxSampleSize = 1000;
 
 const numOfClasses = 1;
 
@@ -13,8 +13,8 @@ const imageWidth = 8;
 const imageHeight = 8;
 const imageChannels = 7;
 
-const batchSize = 1000;
-const epochsValue = 400;
+const batchSize = 100;
+const epochsValue = 100;
 
 // Define the model architecture
 const buildModel = function () {

@@ -15,5 +15,7 @@ module.exports = {
     ecmaVersion: 13,
     sourceType: 'module',
   },
-  rules: {},
+  rules: {
+    '@typescript-eslint/no-var-requires': 'off',
+  },
 };

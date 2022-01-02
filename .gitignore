@@ -4,3 +4,6 @@ cache
 results
 dist
 .vscode
+newCache
+cache.old
+cache 2.zip
