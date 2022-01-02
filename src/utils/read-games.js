@@ -138,7 +138,7 @@ const cacheGame = async ({ game, fileName, folderName }) => {
   try {
     const cacheFileName = path.resolve(`cache/${folderName}/${fileName}.json`);
     await fs.mkdir(path.resolve('cache', folderName), { recursive: true });
-    return fs.writeFile(cacheFileName, JSON.stringify(game));
+    return fs.writeFile(cacheFileName, JSON.stringify(game, null, 2));
   } catch (e) {
     console.error(e);
   }
@@ -170,12 +170,12 @@ const readGames = async ({ folderName, skip = 0, limit = 9999999999 }) => {
     if (!fileName || fileIndex - skip > limit) return { game: null, gameIndex: null };
 
     const cached = await getCachedGame({ fileName, folderName });
-    if (cached) return { gameIndex: fileIndex - 1, game: cached };
+    if (cached) return { gameIndex: fileIndex - 1, game: cached, fileName };
 
     const htmlContent = await fs.readFile(path.resolve(sourceDir, fileName), 'utf-8');
     const game = await processHtml({ htmlContent, fileName });
     await cacheGame({ game, fileName, folderName });
-    return { gameIndex: fileIndex - 1, game };
+    return { gameIndex: fileIndex - 1, game, fileName };
   };
 
   return {

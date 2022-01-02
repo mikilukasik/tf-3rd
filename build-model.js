@@ -5,86 +5,40 @@ const fs = require('fs').promises;
 const path = require('path');
 
 const folderName = 'otb_2000+_chkmt/2000+chkmt';
-const maxSampleSize = 1000;
+const maxSampleSize = 330000;
 
-const numOfClasses = 1;
-
-const imageWidth = 8;
-const imageHeight = 8;
-const imageChannels = 7;
+const outUnits = 1;
+const inUnits = 7; //9;
 
 const batchSize = 100;
-const epochsValue = 100;
+const epochsValue = 30;
 
-// Define the model architecture
+const depthToLearn = 1;
+
+const conv = (filters, activation, inputShape) =>
+  tf.layers.conv2d({
+    ...(inputShape && { inputShape }),
+    filters,
+    kernelSize: 8,
+    padding: 'same',
+    activation,
+  });
+
+const modelFormat = [
+  conv(64, 'sigmoid', [8, 8, inUnits]),
+  conv(64, 'sigmoid'),
+  tf.layers.flatten(),
+  tf.layers.dense({ units: 64, activation: 'sigmoid' }),
+];
+
 const buildModel = function () {
   const model = tf.sequential();
 
-  // add the model layers
-  // model.add(
-  //   tf.layers.conv2d({
-  //     inputShape: [imageWidth, imageHeight, imageChannels],
-  //     filters: 32,
-  //     kernelSize: 5,
-  //     padding: 'same',
-  //     activation: 'sigmoid',
-  //   }),
-  // );
-
-  model.add(
-    tf.layers.conv2d({
-      inputShape: [imageWidth, imageHeight, imageChannels],
-      filters: 64,
-      kernelSize: 8,
-      padding: 'same',
-      activation: 'sigmoid',
-      // strides: 1,
-    }),
-  );
-
-  // model.add(
-  //   tf.layers.maxPooling2d({
-  //     poolSize: 2,
-  //     strides: 2,
-  //   }),
-  // );
-
-  model.add(
-    tf.layers.conv2d({
-      filters: 64,
-      kernelSize: 8,
-      padding: 'same',
-      activation: 'sigmoid',
-      // strides: 1,
-    }),
-  );
-
-  // model.add(
-  //   tf.layers.maxPooling2d({
-  //     poolSize: 2,
-  //     strides: 2,
-  //   }),
-  // );
-
-  model.add(tf.layers.flatten());
+  modelFormat.forEach(model.add.bind(model));
 
   model.add(
     tf.layers.dense({
-      units: 64,
-      activation: 'sigmoid',
-    }),
-  );
-
-  // model.add(
-  //   tf.layers.dense({
-  //     units: 64,
-  //     activation: 'sigmoid',
-  //   }),
-  // );
-
-  model.add(
-    tf.layers.dense({
-      units: numOfClasses,
+      units: outUnits,
       activation: 'sigmoid',
     }),
   );
@@ -118,19 +72,13 @@ const jsonStream = StreamArray.withParser();
 const loadData = function (data) {
   const transform = ({ xs, ys }) => {
     return {
-      xs: tf.tensor(xs, [imageWidth, imageHeight, imageChannels]),
+      xs: tf.tensor(xs, [8, 8, inUnits]),
       ys: tf.tensor1d(ys),
     };
   };
 
   // load, normalize, transform, batch
-  return (
-    tf.data
-      .array(data)
-      // .csv(dataUrl, {columnConfigs: {label: {isLabel: true}}})
-      .map(transform)
-      .batch(batchSize)
-  );
+  return tf.data.array(data).map(transform).batch(batchSize);
 };
 
 // train the model against the training data
@@ -241,105 +189,123 @@ const logAndRun = () => {
   run();
 };
 
-const fenToFlatArray = ({ fenStr, wn: _wn }) => {
-  const wn = _wn ? 1 : 0;
-  const resultingArray = [];
-  fenStr.split('').forEach((char) => {
-    // switch (char) {
-    //   case 'p':
-    //     resultingArray.push(0, 0.1);
-    //     break;
-    //   case 'b':
-    //     resultingArray.push(0, 0.2);
-    //     break;
-    //   case 'n':
-    //     resultingArray.push(0, 0.3);
-    //     break;
-    //   case 'r':
-    //     resultingArray.push(0, 0.4);
-    //     break;
-    //   case 'q':
-    //     resultingArray.push(0, 0.6);
-    //     break;
-    //   case 'k':
-    //     resultingArray.push(0, 1);
-    //     break;
+const addCastling = ({ arr, castling }) => {
+  // mutating for performance
+  const setTo1 = (index) => (arr[(index + 1) * inUnits - 2] = 1);
 
-    //   case 'P':
-    //     resultingArray.push(0.1, 0);
-    //     break;
-    //   case 'B':
-    //     resultingArray.push(0.2, 0);
-    //     break;
-    //   case 'N':
-    //     resultingArray.push(0.3, 0);
-    //     break;
-    //   case 'R':
-    //     resultingArray.push(0.4, 0);
-    //     break;
-    //   case 'Q':
-    //     resultingArray.push(0.6, 0);
-    //     break;
-    //   case 'K':
-    //     resultingArray.push(1, 0);
-    //     break;
+  // if (castling.includes('q')) [0, 1, 2, 3, 4].forEach(setTo1);
+  // if (castling.includes('k')) [4, 5, 6, 7].forEach(setTo1);
+  // if (castling.includes('Q')) [56, 57, 58, 59, 60].forEach(setTo1);
+  // if (castling.includes('K')) [60, 61, 62, 63].forEach(setTo1);
 
-    //   case '/':
-    //     break;
+  if (castling.includes('q')) [0, 4].forEach(setTo1);
+  if (castling.includes('k')) [4, 7].forEach(setTo1);
+  if (castling.includes('Q')) [56, 60].forEach(setTo1);
+  if (castling.includes('K')) [60, 63].forEach(setTo1);
+};
 
-    //   default:
-    //     resultingArray.push(...new Array(Number(char) * 2).fill(0));
-    // }
+const addEnPassant = ({ arr, enPassant }) => {
+  if (enPassant === '-') return;
 
+  const index = 8 * (8 - Number(enPassant[1])) + (enPassant.charCodeAt(0) - 97);
+  arr[(index + 1) * inUnits - 1] = 1;
+};
+
+const fenToFlatArray = ({ fenStr }) => {
+  const [board, nextChar, castling, enPassant] = fenStr.split(' ');
+  const wn = nextChar === 'w';
+  const arr = [];
+
+  board.split('').forEach((char) => {
     switch (char) {
       case 'p':
-        resultingArray.push(wn, 1, 0, 0, 0, 0, 0);
+        arr.push(wn, 1, 0, 0, 0, 0, 0); //, 0, 0);
         break;
       case 'b':
-        resultingArray.push(wn, 0, 1, 0, 0, 0, 0);
+        arr.push(wn, 0, 1, 0, 0, 0, 0); //, 0, 0);
         break;
       case 'n':
-        resultingArray.push(wn, 0, 0, 1, 0, 0, 0);
+        arr.push(wn, 0, 0, 1, 0, 0, 0); //, 0, 0);
         break;
       case 'r':
-        resultingArray.push(wn, 0, 0, 0, 1, 0, 0);
+        arr.push(wn, 0, 0, 0, 1, 0, 0); //, 0, 0);
         break;
       case 'q':
-        resultingArray.push(wn, 0, 0, 0, 0, 1, 0);
+        arr.push(wn, 0, 0, 0, 0, 1, 0); //, 0, 0);
         break;
       case 'k':
-        resultingArray.push(wn, 0, 0, 0, 0, 0, 1);
+        arr.push(wn, 0, 0, 0, 0, 0, 1); //, 0, 0);
         break;
 
       case 'P':
-        resultingArray.push(wn, -1, 0, 0, 0, 0, 0);
+        arr.push(wn, -1, 0, 0, 0, 0, 0); //, 0, 0);
         break;
       case 'B':
-        resultingArray.push(wn, 0, -1, 0, 0, 0, 0);
+        arr.push(wn, 0, -1, 0, 0, 0, 0); //, 0, 0);
         break;
       case 'N':
-        resultingArray.push(wn, 0, 0, -1, 0, 0, 0);
+        arr.push(wn, 0, 0, -1, 0, 0, 0); //, 0, 0);
         break;
       case 'R':
-        resultingArray.push(wn, 0, 0, 0, -1, 0, 0);
+        arr.push(wn, 0, 0, 0, -1, 0, 0); //, 0, 0);
         break;
       case 'Q':
-        resultingArray.push(wn, 0, 0, 0, 0, -1, 0);
+        arr.push(wn, 0, 0, 0, 0, -1, 0); //, 0, 0);
         break;
       case 'K':
-        resultingArray.push(wn, 0, 0, 0, 0, 0, -1);
+        arr.push(wn, 0, 0, 0, 0, 0, -1); //, 0, 0);
         break;
 
       case '/':
         break;
 
       default:
-        // resultingArray.push(...Array.from({ length: Number(char) }).map(() => 0.5));
-        for (let emptyIndex = 0; emptyIndex < Number(char); emptyIndex += 1) resultingArray.push(wn, 0, 0, 0, 0, 0, 0);
-      // resultingArray.push(...new Array(Number(char) * 12).fill(0));
+        // arr.push(...Array.from({ length: Number(char) }).map(() => 0.5));
+        for (let emptyIndex = 0; emptyIndex < Number(char); emptyIndex += 1) arr.push(wn, 0, 0, 0, 0, 0, 0); //, 0, 0);
+      // arr.push(...new Array(Number(char) * 12).fill(0));
     }
   });
-  return resultingArray;
+
+  // addCastling({ arr, castling });
+  // addEnPassant({ arr, enPassant });
+
+  return arr;
+};
+
+// const getScoresForDepths = (scoresPerDepth, depths, fileName) => {
+//   try {
+//     return depths
+//       .map((depth) => {
+//         const { cp, mate, bmc } = scoresPerDepth[depth];
+//         return [mate === null ? cp : (1 / mate) * 1000, bmc];
+//       })
+//       .flat();
+//   } catch (e) {
+//     console.log({ scoresPerDepth, depths, e, fileName });
+//     throw e;
+//   }
+// };
+// const stats = { minCp: 0, maxCp: 0, minMate: 0, maxMate: 0, minBmc: 0, maxBmc: 0 };
+const getScoreForDepth = (scoresPerDepth, wNext, depth) => {
+  try {
+    const { cp, mate, bmc } = scoresPerDepth[depth];
+    // if (cp < stats.minCp) stats.minCp = cp;
+    // if (cp > stats.maxCp) stats.maxCp = cp;
+    // if (mate < stats.minMate) stats.minMate = mate;
+    // if (mate > stats.maxMate) stats.maxMate = mate;
+    // if (bmc < stats.minBmc) stats.minBmc = bmc;
+    // if (bmc > stats.maxBmc) stats.maxBmc = bmc;
+    // if (Math.random() > 0.99) console.log(stats);
+
+    let score =
+      mate === null ? Math.min(7000, Math.max(-7000, cp)) / 16000 + 0.5 : mate > 0 ? 1 - mate / 100 : 0 - mate / 100;
+
+    if (!wNext) score = 1 - score;
+    return score;
+  } catch (e) {
+    console.log({ scoresPerDepth, wNext, depth });
+    throw e;
+  }
 };
 
 const start = async () => {
@@ -349,20 +315,31 @@ const start = async () => {
     const { getNextGame } = await readGames({ folderName });
 
     while (lesson.train.length < maxSampleSize) {
-      const { game, gameIndex } = await getNextGame();
+      const { game, gameIndex, fileName } = await getNextGame();
       if (!game) break;
 
       const { fens, result } = game;
+
+      // fens.pop();
+
       for (const {
         fenStr,
-        stockfishScores: { wn, bn },
+        stockfishScores: {
+          eval: _eval,
+          search: { scoresPerDepth },
+        },
       } of fens) {
         // console.log({ index, fenStr, wn, bn });
 
+        // we don't learn mate now. The engine will know what to do anyways
+        if (!scoresPerDepth || scoresPerDepth.length === 0) continue;
+
         // if (bn){
         lesson[gameIndex % 50 === 0 ? 'test' : 'train'].push({
-          xs: fenToFlatArray({ fenStr, wn, bn }),
-          ys: [bn],
+          xs: fenToFlatArray({ fenStr }),
+          ys: [_eval / 168 + 0.5],
+          // ys: [getScoreForDepth(scoresPerDepth, fenStr.split(' ')[1] === 'w', depthToLearn)],
+          // ys: [_eval, ...getScoresForDepths(scoresPerDepth, [0, 1, 2, 3], fileName)],
         });
         // }
         if (lesson.train.length % 5000 === 0 /*&& bn*/) {
