@@ -4,51 +4,6 @@ sf.onmessage = () => null;
 const getVal = (str, label) => (str.match(new RegExp(`(^| )${label} (-?[a-z0-9.]+d*(.d+)?)($| )`)) || [])[2];
 const getNumberVal = (...args) => Number(getVal(...args)) || null;
 
-// const trimAndFillGaps = (_arr) => {
-//   const arr = _arr.slice(1);
-//   // const keys = ['cp', 'mate', 'bmc'];
-
-//   // let found1stElm = false;
-//   // for (const [index, elm] of arr.entries()) {
-//   //   if (!elm && found1stElm) {
-//   //     let prevFilledIndex = index - 1;
-//   //     while (!arr[prevFilledIndex]) {
-//   //       if (prevFilledIndex === 0) {
-//   //         arr[0] = { cp: 0, mate: NaN, bmc: 0, estimated: true };
-//   //         break;
-//   //       }
-//   //       prevFilledIndex -= 1;
-//   //       if (prevFilledIndex < 0) {
-//   //         console.warn(1, _arr, arr, index, prevFilledIndex);
-//   //       }
-//   //     }
-//   //     let nextFilledIndex = index + 1;
-//   //     while (!arr[nextFilledIndex]) {
-//   //       nextFilledIndex += 1;
-//   //       if (nextFilledIndex >= arr.length) {
-//   //         console.warn(2, _arr, arr, index, nextFilledIndex);
-//   //       }
-//   //     }
-
-//   //     let updatingIndex = index;
-//   //     while (!arr[updatingIndex]) {
-//   //       arr[updatingIndex] = keys.reduce(
-//   //         (estimatedLine, key) => {
-//   //           estimatedLine[key] = (arr[prevFilledIndex][key] + arr[nextFilledIndex][key]) / 2;
-//   //           return estimatedLine;
-//   //         },
-//   //         { estimated: true },
-//   //       );
-
-//   //       updatingIndex += 1;
-//   //     }
-//   //   }
-//   //   found1stElm = true;
-//   // }
-
-//   return arr;
-// };
-
 module.exports = {
   getStockfishEvalScore: (fen) =>
     new Promise((r) => {
@@ -108,6 +63,6 @@ module.exports = {
 
       sf.postMessage('setoption name Ponder value false');
       sf.postMessage(`position fen ${fen}`);
-      sf.postMessage('go depth 8');
+      sf.postMessage('go depth 4');
     }),
 };

@@ -6,4 +6,7 @@ dist
 .vscode
 newCache
 cache.old
+cache.less.old
 cache 2.zip
+cache_not_new
+results
