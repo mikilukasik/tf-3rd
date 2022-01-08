@@ -65,7 +65,6 @@ const { processRecord, writeCache } = (() => {
 
 const run = async () => {
   const { getNextGame } = await readGames({ folderNames: sourceFolders, movesFile, endsWithMate, endsWithStall });
-  // await fs.mkdir(path.resolve(destFolder), { recursive: true });
 
   for (
     let { game, gameIndex, totalGames } = await getNextGame();

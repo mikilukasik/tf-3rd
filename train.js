@@ -1,40 +1,30 @@
 const tf = require('@tensorflow/tfjs-node');
-const { readGames } = require('./src/utils/read-games');
 const fs = require('fs').promises;
 const path = require('path');
+const { fen2flatArray } = require('./transform');
+// require('@tensorflow/tfjs-backend-wasm');
 
-const { transform } = require('./transform');
-
-const folderName = 'recent/OTB-HQ/otb_1800_chkmt';
-
-const maxSampleSize = 10000000;
-const dataSetSize = 1000000;
-const outputMultiplier = 1.5;
+const datasetDirName = 'data/datasets/all_frontSpread_cm+sm_noResign_noDrawSmOnly';
+const modelDirName = 'models/all_frontSpread_cm+sm_noResign_noDrawSmOnly_c32t-d32l-t';
+const filesPerDataset = 10;
 const outUnits = 1;
-
-const castlingIndex = 0;
-const enPassantIndex = 0;
+const castlingIndex = 7;
+const enPassantIndex = 0; //8;
 const inputLength = 7 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
-
-const batchSize = 800;
-const epochsValue = 30;
-const patience = 30;
-const dropoutRate = 0.1;
-const bucketConfig = {
-  '>  0.002': (x) => x > 0.002,
-  '     ~ 0': (x) => x >= -0.002 && x <= 0.002,
-  '< -0.002': (x) => x < -0.002,
-};
-
+const batchSize = 1000;
+const epochsValue = 15;
+const patience = 5;
 const startTime = Date.now();
-const saveModelPath = path.resolve(`./results/${startTime}_s${Math.floor(maxSampleSize / 1000)}k_e${epochsValue}`);
 
+const tensorsToDispose = [];
 let sourceCode;
 let transformCode;
+let trainingMeta = {};
+let allDatasetFiles;
 
 const constants = {
-  folderName,
-  maxSampleSize,
+  datasetDirName,
+  modelDirName,
   outUnits,
   castlingIndex,
   enPassantIndex,
@@ -42,11 +32,31 @@ const constants = {
   batchSize,
   epochsValue,
   patience,
-  outputMultiplier,
-  dropoutRate,
-  bucketConfig,
-  dataSetSize,
   startTime,
+  filesPerDataset,
+};
+
+const saveTrainingMeta = () =>
+  fs.writeFile(path.resolve(modelDirName, 'trainingMeta.json'), JSON.stringify(trainingMeta, null, 2));
+
+const loadTrainingMeta = async () => {
+  try {
+    trainingMeta = JSON.parse(await fs.readFile(path.resolve(modelDirName, 'trainingMeta.json')));
+  } catch (e) {
+    await updateTrainingMeta({
+      ...constants,
+      iterations: [],
+      filesLearned: [],
+      samplesLearned: 0,
+      completedIterations: 0,
+      completedEpochs: 0,
+    });
+  }
+};
+
+const updateTrainingMeta = async (obj) => {
+  Object.assign(trainingMeta, obj);
+  await saveTrainingMeta();
 };
 
 // Define the model architecture
@@ -61,9 +71,9 @@ const conv = (filters, activation, kernelSize = 8) =>
 const buildModel = function () {
   const input = tf.input({ shape: [8, 8, inputLength] });
 
-  const conv1 = conv(48, 'tanh').apply(input);
+  const conv1 = conv(32, 'tanh').apply(input);
   const flat1 = tf.layers.flatten().apply(conv1);
-  const dense2 = tf.layers.dense({ units: 64, activation: 'linear' }).apply(flat1);
+  const dense2 = tf.layers.dense({ units: 32, activation: 'linear' }).apply(flat1);
 
   const output = tf.layers.dense({ units: outUnits, activation: 'tanh' }).apply(dense2);
 
@@ -78,96 +88,62 @@ const buildModel = function () {
   return model;
 };
 
-const lesson = {
-  buckets: {},
-  train: [],
-  test: [],
-  fileNames: {},
+const transformRecord = (record) => {
+  // console.log(22);
+  const {
+    fen, // : "2q5/6p1/p3q3/P7/k7/8/3K4/8 b - -",
+    result, // : 0,
+    wNext, // : false,
+    nextMove, // : "Kxa5",
+    prevMove, // : "Kd2",
+    nextFen, // : "2q5/6p1/p3q3/k7/8/8/3K4/8 w - -",
+    prevFen, // : "2q5/6p1/p3q3/P7/k7/8/8/3K4 w - -",
+    fenIndex, // : 131,
+    isStrart, // : false,
+    isMate, // : false
+    fensLength, // : 147,
+    isStall, // : false,
+    balance, // : -19,
+    balancesAhead, // : [-19, -20, -20, -20, -20, -20, -20, -20, -20, -20, -20, -20, -20, -28, -28, -28],
+    fileName, // : "esn_6483.html"
+  } = record;
+
+  const xs = fen2flatArray({ fenStr: fen, inputLength, castlingIndex, enPassantIndex });
+
+  if (isStrart || isStall) return { xs, ys: [0] };
+  if (isMate) return { xs, ys: [result] };
+
+  const resultScore = result / (fensLength - fenIndex - 1);
+
+  const balanceFiller = result * 50;
+
+  const balanceScore =
+    balancesAhead
+      .concat(Array(30).fill(balanceFiller))
+      .slice(0, 30)
+      .reduce((p, c, i) => {
+        if (i % 2 === 1) return p;
+        return p + c / Math.pow(2, i / 2);
+      }, 0) / 100;
+
+  const ys = [(3 * balanceScore + resultScore) / 4];
+
+  if (ys[0] < -1 || ys[0] > 1)
+    console.warn({ balanceScore, balancesAhead, result, b: balancesAhead.concat(Array(30).fill(balanceFiller)) });
+
+  return { xs, ys };
 };
-
-const outputStats = {
-  min: 0,
-  max: 0,
-};
-
-// const bucketBoundries = Array(buckets + 1)
-//   .fill(0)
-//   .map((e, index) => 1 - (index * 2) / buckets);
-const bucketNames = Object.keys(bucketConfig);
-const bucketNameCount = bucketNames.length;
-const getBucketName = (val) => bucketNames.find((bucketName) => bucketConfig[bucketName](val));
-
-let ignoredSamples = 0;
-let acceptedSamples = 0;
-const addToBucket = ({ input, output: _output, fileName }) => {
-  const output = _output * outputMultiplier;
-  // if (output < -1 || output > 1) {
-  //   // console.warn(`Output ${output} is out of range in ${fileName}`);
-  //   ignoredSamples += 1;
-  //   return;
-  // }
-
-  // if (output <= -0.6 || output >= 0.6) {
-  //   // console.warn(`Output ${output} is out of range in ${fileName}`);
-  //   ignoredSamples += 1;
-  //   return;
-  // }
-
-  // if (output !== 1 && output !== -1) {
-  //   output = Math.min(Math.max(output * outputMultiplier, -0.99), 0.99);
-  // }
-
-  const bucketName = getBucketName(output);
-  // const bucketName = Math.floor(output * (buckets / 2));
-  if (!lesson.buckets[bucketName]) lesson.buckets[bucketName] = [];
-
-  if (lesson.buckets[bucketName].length >= maxSampleSize / bucketNameCount) {
-    // bucket is full
-    ignoredSamples += 1;
-
-    return;
-  }
-
-  acceptedSamples += 1;
-  lesson.fileNames[fileName] = true;
-  lesson.buckets[bucketName].push({
-    xs: input,
-    ys: [output],
-  });
-
-  if (outputStats.min > output) outputStats.min = output;
-  if (outputStats.max < output) outputStats.max = output;
-};
-
-const pourBuckets = async () => {
-  console.log('Creating train and test datasets');
-  console.log({ outputStats });
-
-  Object.keys(lesson.buckets).forEach((bucketName) => {
-    console.log(`${bucketName} ${lesson.buckets[bucketName].length}`);
-    lesson.buckets[bucketName].sort(() => Math.random() - 0.5);
-
-    const tenProcent = Math.floor(lesson.buckets[bucketName].length / 10);
-    lesson.train = lesson.train.concat(lesson.buckets[bucketName].splice(tenProcent));
-    lesson.test = lesson.test.concat(lesson.buckets[bucketName]);
-  });
-  delete lesson.buckets;
-
-  await fs.writeFile(
-    path.resolve(saveModelPath, 'fileNames.json'),
-    JSON.stringify(Object.keys(lesson.fileNames)),
-    'utf8',
-  );
-};
-
-// Build, train a model with a subset of the data
 
 // load and normalize data
 const loadData = function (data) {
   const transform = ({ xs, ys }) => {
+    xs = tf.tensor(xs, [8, 8, inputLength]);
+    ys = tf.tensor1d(ys);
+
+    tensorsToDispose.push(xs, ys);
     return {
-      xs: tf.tensor(xs, [8, 8, inputLength]),
-      ys: tf.tensor1d(ys),
+      xs,
+      ys,
     };
   };
 
@@ -176,9 +152,9 @@ const loadData = function (data) {
 };
 
 // train the model against the training data
-const trainModel = async function (model, trainingData, epochs = epochsValue) {
+const trainModel = async function ({ model, trainData, epochs = epochsValue, iterationIndex, remainingRatio }) {
   let started;
-
+  // console.log
   const options = {
     epochs,
     verbose: 0,
@@ -196,35 +172,34 @@ const trainModel = async function (model, trainingData, epochs = epochsValue) {
         onEpochEnd: async (epoch, logs) => {
           const elapsed = Date.now() - started;
 
-          let msPerIteration;
-          let speed;
-          const remainingIterations = epochsValue - epoch - 1;
-          let remainingHours;
+          // let msPerIteration;
+          // let speed;
+          const remainingEpochs = epochsValue - epoch - 1;
+          // let remainingHours;
 
-          // if (epoch > 0) {
-          msPerIteration = elapsed / (epoch + 1);
-          speed = `${((60 * 60 * 1000) / msPerIteration).toFixed(1)}/h`;
-          remainingHours = ((msPerIteration * remainingIterations) / 1000 / 60 / 60).toFixed(2);
-          // }
+          const msPerIteration = elapsed / (epoch + 1);
+          const speed = `${((60 * 60 * 1000) / msPerIteration).toFixed(1)}/h`;
+          const remainingHours = (msPerIteration * remainingEpochs) / 1000 / 60 / 60; //.toFixed(2);
+          const totalRemainingHours = remainingHours + (msPerIteration * epochsValue * remainingRatio) / 1000 / 60 / 60; //.toFixed(2);
 
-          //  lastLog = { lessonType, lessonName, error, iterations, speed };
           console.log({
             ...logs,
             completed: `${epoch + 1} / ${epochsValue}`,
             speed,
-            remainingHours,
+            remainingHours: remainingHours.toFixed(2),
+            totalRemainingHours: totalRemainingHours.toFixed(2),
           });
         },
       }),
     ],
   };
 
-  return await model.fitDataset(trainingData, options);
+  return await model.fitDataset(trainData, options);
 };
 
 // verify the model against the test data
-const evaluateModel = async function (model, testingData) {
-  const evalResult = await model.evaluateDataset(testingData);
+const evaluateModel = async function ({ model, testData, tempFolder }) {
+  const evalResult = await model.evaluateDataset(testData);
   const [loss, meanAbsoluteError] = evalResult.map((r) =>
     r
       .dataSync()
@@ -237,7 +212,7 @@ const evaluateModel = async function (model, testingData) {
   const result = { loss, meanAbsoluteError };
   console.log(result);
   await fs.writeFile(
-    path.resolve(saveModelPath, 'evaluation.json'),
+    path.resolve(tempFolder, 'evaluation.json'),
     JSON.stringify({ ...result, evalResult }, null, 2),
     'utf8',
   );
@@ -245,128 +220,140 @@ const evaluateModel = async function (model, testingData) {
   return result;
 };
 
+const getNextDatasets = async () => {
+  const filesLoaded = [];
+
+  let records = [];
+  for (let nextFileIndex = 0; nextFileIndex < filesPerDataset; nextFileIndex += 1) {
+    const fileName = allDatasetFiles.pop();
+    if (!fileName) return null;
+
+    filesLoaded.push(fileName);
+
+    const fullFileName = path.resolve(datasetDirName, fileName);
+    console.log(`Loading dataset from ${fullFileName}`);
+
+    records = records.concat(JSON.parse(await fs.readFile(fullFileName, 'utf8')));
+  }
+
+  records.sort(() => Math.random() - 0.5);
+  const tenProcent = Math.floor(records.length / 10);
+
+  const trainData = records.splice(tenProcent);
+  return { trainData, testData: records, filesLoaded, remainingFiles: allDatasetFiles.length };
+};
+
+const saveModel = async ({ model, tempFolder, info }) => {
+  console.log('Saving model...');
+  await model.save(`file://${tempFolder}`);
+  await fs.writeFile(path.resolve(tempFolder, 'info.json'), JSON.stringify(info, null, 2), 'utf8');
+  await fs.writeFile(path.resolve(tempFolder, 'source.js'), sourceCode, 'utf8');
+  await fs.writeFile(path.resolve(tempFolder, 'transform.js'), transformCode, 'utf8');
+  await fs.writeFile(path.resolve(tempFolder, 'constants.json'), JSON.stringify(constants, null, 2), 'utf8');
+};
+
+const saveTestData = async ({ testData, iterationIndex }) =>
+  fs.writeFile(path.resolve(trainingMeta.testDataFolder, `i${iterationIndex}.json`), JSON.stringify(testData), 'utf8');
+
+const runIteration = async ({ model, iterationIndex }) => {
+  const iterationStart = Date.now();
+
+  const tempFolder = path.resolve(modelDirName, iterationStart.toString());
+  await fs.mkdir(tempFolder, { recursive: true });
+
+  const dataset = await getNextDatasets();
+  if (!dataset) return { finished: true };
+
+  const { trainData: rawTrainData, testData: rawTestData, filesLoaded, remainingFiles } = dataset;
+
+  const trainData = loadData(rawTrainData.map(transformRecord));
+  const testData = loadData(rawTestData.map(transformRecord));
+
+  const info = await trainModel({
+    model,
+    trainData,
+    iterationIndex,
+    remainingRatio: remainingFiles / filesLoaded.length,
+  });
+  console.log(info);
+
+  await saveModel({ model, tempFolder, info });
+
+  const samplesLearned = trainingMeta.samplesLearned + rawTrainData.length;
+  await updateTrainingMeta({ filesLearned: trainingMeta.filesLearned.concat(filesLoaded), samplesLearned });
+
+  console.log('Evaluating model...');
+  const { meanAbsoluteError } = await evaluateModel({ model, testData, tempFolder });
+
+  const iterationFolderName = tempFolder.replace(
+    iterationStart.toString(),
+    `${meanAbsoluteError}-s${(samplesLearned / 1000000).toFixed(2)}M-e${epochsValue}-${iterationStart.toString()}`,
+  );
+  await fs.rename(tempFolder, iterationFolderName);
+
+  await updateTrainingMeta({
+    iterations: trainingMeta.iterations.concat({
+      ...info,
+      meanAbsoluteError,
+      folder: iterationFolderName,
+    }),
+    completedIterations: trainingMeta.completedIterations + 1,
+    completedEpochs: trainingMeta.completedEpochs + info.params.epochs,
+    samplesLearned,
+  });
+
+  await saveTestData({ testData: rawTestData, iterationIndex });
+  tensorsToDispose.forEach((t) => {
+    try {
+      t.dispose();
+    } catch (e) {
+      /* */
+    }
+  });
+
+  return { finished: false };
+};
+
 // run
 const run = async function () {
-  const trainData = loadData(lesson.train);
-  const testData = loadData(lesson.test);
+  await init();
 
+  // TODO: should load prev model here!
   const model = buildModel();
   model.summary();
 
-  const info = await trainModel(model, trainData);
-  console.log(info);
+  let iteraiterationIndex = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    let { finished } = await runIteration({ model, iterationIndex: iteraiterationIndex++ });
+    if (finished) break;
+  }
 
-  console.log('Saving model...');
-  await model.save(`file://${saveModelPath}`);
-  await fs.writeFile(path.resolve(saveModelPath, 'info.json'), JSON.stringify(info, null, 2), 'utf8');
-  await fs.writeFile(path.resolve(saveModelPath, 'source.js'), sourceCode, 'utf8');
-  await fs.writeFile(path.resolve(saveModelPath, 'transform.js'), transformCode, 'utf8');
-  await fs.writeFile(path.resolve(saveModelPath, 'constants.json'), JSON.stringify(constants, null, 2), 'utf8');
-
-  console.log('Evaluating model...');
-  const { meanAbsoluteError } = await evaluateModel(model, testData);
-
-  await fs.rename(saveModelPath, saveModelPath.replace(startTime, `${meanAbsoluteError}-${startTime}`));
+  console.log('DONE');
 };
 
-let ran = false;
-const logAndRun = () => {
-  if (ran) return;
-  ran = true;
-
-  console.log('loading completed.');
-  console.log(`loaded ${lesson.train.length} training samples.`);
-  console.log(`loaded ${lesson.test.length} test samples.`);
-
-  run();
-};
-
-const start = async () => {
+const init = async () => {
   try {
+    // if (await tf.setBackend('wasm')) console.log('TF will use WASM.');
+
     sourceCode = await fs.readFile('./train.js', 'utf8');
     transformCode = await fs.readFile('./transform.js', 'utf8');
-    await fs.mkdir(path.resolve(saveModelPath), { recursive: true });
 
-    const { getNextGame } = await readGames({ folderName });
+    const fullModelDirname = path.resolve(modelDirName);
+    await fs.mkdir(fullModelDirname, { recursive: true });
 
-    // const outputStats = {
-    //   min: 0,
-    //   max: 0,
-    // };
+    const testDataFolder = path.resolve(fullModelDirname, 'testDataUsed');
+    await fs.mkdir(testDataFolder, { recursive: true });
 
-    while (acceptedSamples < maxSampleSize) {
-      const { game, gameIndex, fileName } = await getNextGame();
-      if (!game) break;
+    await loadTrainingMeta();
+    await updateTrainingMeta({ testDataFolder });
 
-      const { fens, result } = game;
-      const fensCount = fens.length;
-
-      for (const [
-        fenIndex,
-        {
-          fenStr,
-          stockfishScores: { eval: _eval },
-          balanceDiffsAhead,
-          balance,
-        },
-      ] of fens.entries()) {
-        // const output = _eval / 180 + 0.5; // / 168 + 0.5;
-
-        // const progress = Math.pow((fenIndex + 1) / fensCount, 3) / 2;
-        // const output = 0.5 + (result.bw ? -progress : 0) + (result.ww ? progress : 0);
-
-        const output =
-          (balance +
-            balanceDiffsAhead[2] / 2 +
-            balanceDiffsAhead[4] / 4 +
-            balanceDiffsAhead[6] / 8 +
-            balanceDiffsAhead[8] / 16 +
-            balanceDiffsAhead[10] / 32 +
-            balanceDiffsAhead[12] / 64 +
-            balanceDiffsAhead[14] / 128 +
-            balanceDiffsAhead[16] / 256 +
-            balanceDiffsAhead[18] / 521) /
-          80;
-
-        // const output =
-        //   fenIndex === fensCount - 1
-        //     ? result.ww
-        //       ? 1
-        //       : result.bw
-        //       ? -1
-        //       : 0
-        //     : balance /*+ balanceDiffsAhead[2]*/ / //+
-        //       // balanceDiffsAhead[4] / 2 +
-        //       // balanceDiffsAhead[6] / 3 +
-        //       // balanceDiffsAhead[8] / 4) /
-        //       59;
-
-        // if (outputStats.min > output) outputStats.min = output;
-        // if (outputStats.max < output) outputStats.max = output;
-
-        addToBucket({ input: transform({ fenStr, castlingIndex, enPassantIndex, inputLength }), output, fileName });
-
-        if ((acceptedSamples + ignoredSamples) % 100000 === 0) {
-          console.log(acceptedSamples, maxSampleSize);
-          console.log(`accepted ${acceptedSamples} samples.`);
-          console.log(`ignored ${ignoredSamples} samples.`);
-          Object.keys(lesson.buckets).forEach((bucketName) => {
-            console.log(`${bucketName} ${(lesson.buckets[bucketName] || []).length}`);
-          });
-          console.log('');
-        }
-      }
-    }
-
-    await pourBuckets();
-    // console.log({ outputStats });
-
-    // await fs.writeFile('./samplesBn500k.json', JSON.stringify(lesson), 'utf8');
-
-    logAndRun();
+    allDatasetFiles = (await fs.readdir(datasetDirName))
+      .filter((fileName) => !trainingMeta.filesLearned.includes(fileName))
+      .sort((a, b) => Number(b.split('-')[1]) - Number(a.split('-')[1]));
   } catch (e) {
     console.error(e);
   }
 };
 
-start();
+run();

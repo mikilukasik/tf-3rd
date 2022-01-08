@@ -17,14 +17,14 @@ const addCastling = ({ arr, castling, castlingIndex, inputLength }) => {
 const addEnPassant = ({ arr, enPassant, enPassantIndex, inputLength }) => {
   if (!enPassantIndex || enPassant === '-') return;
 
-  const row = 8 - Number(enPassant[1]);
+  const row = enPassant[1] === '3' ? 4 : 3;
   const col = enPassant.charCodeAt(0) - 97;
   const index = 8 * row + col;
   arr[index * inputLength + enPassantIndex] = row === 2 ? -1 : 1;
 };
 
-const fen2flatArray = ({ fenStr, inputLength: _inputLength, castlingIndex = 5, enPassantIndex = 0 }) => {
-  const inputLength = _inputLength || 5 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
+const fen2flatArray = ({ fenStr, inputLength: _inputLength, castlingIndex = 7, enPassantIndex = 0 }) => {
+  const inputLength = _inputLength || 7 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
 
   const [board, nextChar, castling, enPassant] = fenStr.split(' ');
   const wn = nextChar === 'w' ? 1 : -1;
@@ -32,41 +32,41 @@ const fen2flatArray = ({ fenStr, inputLength: _inputLength, castlingIndex = 5, e
   board.split('').forEach((char) => {
     switch (char) {
       case 'p':
-        arr.push(wn, -1, 0, 0, 0, ...Array(inputLength - 5).fill(0));
-        break;
-      case 'n':
-        arr.push(wn, 0, -1, 0, 0, ...Array(inputLength - 5).fill(0));
+        arr.push(wn, -1, 0, 0, 0, 0, 0, ...Array(inputLength - 7).fill(0));
         break;
       case 'b':
-        arr.push(wn, 0, 0, -1, 0, ...Array(inputLength - 5).fill(0));
+        arr.push(wn, 0, -1, 0, 0, 0, 0, ...Array(inputLength - 7).fill(0));
+        break;
+      case 'n':
+        arr.push(wn, 0, 0, -1, 0, 0, 0, ...Array(inputLength - 7).fill(0));
         break;
       case 'r':
-        arr.push(wn, 0, 0, 0, -1, ...Array(inputLength - 5).fill(0));
+        arr.push(wn, 0, 0, 0, -1, 0, 0, ...Array(inputLength - 7).fill(0));
         break;
       case 'q':
-        arr.push(wn, 0, 0, -1, -1, ...Array(inputLength - 5).fill(0));
+        arr.push(wn, 0, 0, 0, 0, -1, 0, ...Array(inputLength - 7).fill(0));
         break;
       case 'k':
-        arr.push(wn, -1, -1, -1, -1, ...Array(inputLength - 5).fill(0));
+        arr.push(wn, 0, 0, 0, 0, 0, -1, ...Array(inputLength - 7).fill(0));
         break;
 
       case 'P':
-        arr.push(wn, 1, 0, 0, 0, ...Array(inputLength - 5).fill(0));
-        break;
-      case 'N':
-        arr.push(wn, 0, 1, 0, 0, ...Array(inputLength - 5).fill(0));
+        arr.push(wn, 1, 0, 0, 0, 0, 0, ...Array(inputLength - 7).fill(0));
         break;
       case 'B':
-        arr.push(wn, 0, 0, 1, 0, ...Array(inputLength - 5).fill(0));
+        arr.push(wn, 0, 1, 0, 0, 0, 0, ...Array(inputLength - 7).fill(0));
+        break;
+      case 'N':
+        arr.push(wn, 0, 0, 1, 0, 0, 0, ...Array(inputLength - 7).fill(0));
         break;
       case 'R':
-        arr.push(wn, 0, 0, 0, 1, ...Array(inputLength - 5).fill(0));
+        arr.push(wn, 0, 0, 0, 1, 0, 0, ...Array(inputLength - 7).fill(0));
         break;
       case 'Q':
-        arr.push(wn, 0, 0, 1, 1, ...Array(inputLength - 5).fill(0));
+        arr.push(wn, 0, 0, 0, 0, 1, 0, ...Array(inputLength - 7).fill(0));
         break;
       case 'K':
-        arr.push(wn, 1, 1, 1, 1, ...Array(inputLength - 5).fill(0));
+        arr.push(wn, 0, 0, 0, 0, 0, 1, ...Array(inputLength - 7).fill(0));
         break;
 
       case '/':
@@ -75,7 +75,7 @@ const fen2flatArray = ({ fenStr, inputLength: _inputLength, castlingIndex = 5, e
       default:
         // arr.push(...Array.from({ length: Number(char) }).map(() => 0));
         for (let emptyIndex = 0; emptyIndex < Number(char); emptyIndex += 1)
-          arr.push(wn, 0, 0, 0, 0, ...Array(inputLength - 5).fill(0));
+          arr.push(wn, 0, 0, 0, 0, 0, 0, ...Array(inputLength - 7).fill(0));
       // arr.push(...new Array(Number(char) * 12).fill(0));
     }
   });
