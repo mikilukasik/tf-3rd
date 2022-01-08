@@ -5,15 +5,15 @@ const { fen2flatArray } = require('./transform');
 // require('@tensorflow/tfjs-backend-wasm');
 
 const datasetDirName = 'data/datasets/all_frontSpread_cm+sm_noResign_noDrawSmOnly';
-const modelDirName = 'models/all_frontSpread_cm+sm_noResign_noDrawSmOnly_c32t-d32l-t';
+const modelDirName = 'models/65M_cm+sm_noResign_c32t-d32l-t';
 const filesPerDataset = 10;
 const outUnits = 1;
 const castlingIndex = 7;
 const enPassantIndex = 0; //8;
 const inputLength = 7 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
 const batchSize = 1000;
-const epochsValue = 15;
-const patience = 5;
+const epochsValue = 5;
+const patience = 2;
 const startTime = Date.now();
 
 const tensorsToDispose = [];
@@ -262,7 +262,10 @@ const runIteration = async ({ model, iterationIndex }) => {
   await fs.mkdir(tempFolder, { recursive: true });
 
   const dataset = await getNextDatasets();
-  if (!dataset) return { finished: true };
+  if (!dataset) {
+    // TODO: rename fullModelDirName here
+    return { finished: true };
+  }
 
   const { trainData: rawTrainData, testData: rawTestData, filesLoaded, remainingFiles } = dataset;
 
@@ -310,6 +313,7 @@ const runIteration = async ({ model, iterationIndex }) => {
       /* */
     }
   });
+  tensorsToDispose.length = 0;
 
   return { finished: false };
 };

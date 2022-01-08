@@ -1,0 +1,19 @@
+{
+  "datasetDirName": "data/datasets/all_frontSpread_cm+sm_noResign_noDrawSmOnly",
+  "modelDirName": "models/65M_cm+sm_noResign_c32t-d32l-t",
+  "outUnits": 1,
+  "castlingIndex": 7,
+  "enPassantIndex": 0,
+  "inputLength": 8,
+  "batchSize": 1000,
+  "epochsValue": 5,
+  "patience": 2,
+  "startTime": 1641610742683,
+  "filesPerDataset": 10,
+  "iterations": [],
+  "filesLearned": [],
+  "samplesLearned": 0,
+  "completedIterations": 0,
+  "completedEpochs": 0,
+  "testDataFolder": "/Users/miki/dev/tensorflow/3rd/models/65M_cm+sm_noResign_c32t-d32l-t/testDataUsed"
+}

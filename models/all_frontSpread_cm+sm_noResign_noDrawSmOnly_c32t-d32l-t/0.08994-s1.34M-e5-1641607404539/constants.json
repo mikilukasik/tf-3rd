@@ -1,0 +1,13 @@
+{
+  "datasetDirName": "data/datasets/all_frontSpread_cm+sm_noResign_noDrawSmOnly",
+  "modelDirName": "models/all_frontSpread_cm+sm_noResign_noDrawSmOnly_c32t-d32l-t",
+  "outUnits": 1,
+  "castlingIndex": 7,
+  "enPassantIndex": 0,
+  "inputLength": 8,
+  "batchSize": 1000,
+  "epochsValue": 5,
+  "patience": 2,
+  "startTime": 1641607404512,
+  "filesPerDataset": 10
+}

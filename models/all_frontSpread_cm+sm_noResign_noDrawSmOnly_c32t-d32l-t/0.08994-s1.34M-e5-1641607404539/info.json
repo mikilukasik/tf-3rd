@@ -1,0 +1,39 @@
+{
+  "validationData": null,
+  "params": {
+    "epochs": 5,
+    "initialEpoch": null,
+    "samples": null,
+    "steps": 1344,
+    "batchSize": null,
+    "verbose": 0,
+    "doValidation": false,
+    "metrics": [
+      "loss",
+      "meanAbsoluteError"
+    ]
+  },
+  "epoch": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "history": {
+    "loss": [
+      0.03293581306934357,
+      0.02742275409400463,
+      0.025831006467342377,
+      0.025297021493315697,
+      0.02501039393246174
+    ],
+    "meanAbsoluteError": [
+      0.10782550275325775,
+      0.0967290922999382,
+      0.09250379353761673,
+      0.0912952646613121,
+      0.0908217802643776
+    ]
+  }
+}
