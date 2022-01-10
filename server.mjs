@@ -1,5 +1,8 @@
-const express = require('express');
-const { readGames } = require('./src/utils/read-games');
+// const express = require('express');
+import express from 'express';
+import readGames from './src/utils/readGames.mjs';
+// import readGames } = require('./src/utils/readGames.mjs');
+// const { readGames } = require('./src/utils/readGames.mjs');
 
 const app = express();
 const port = 3500;
@@ -13,7 +16,11 @@ app.get('/games', async (req, res, next) => {
   const skip = Number(req.query.skip) ?? 0;
   const limit = Number(req.query.limit) ?? 1000;
 
-  const { getNextGame } = await readGames({ folderName: req.query.folder || FOLDER_NAME, skip, limit });
+  const { getNextGame } = await readGames({
+    folderNames: (req.query.folder && [req.query.folder]) || [FOLDER_NAME],
+    skip,
+    limit,
+  });
 
   res.write('[');
   for (let i = 0; i < limit; i += 1) {

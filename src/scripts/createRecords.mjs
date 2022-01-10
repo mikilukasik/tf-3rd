@@ -3,12 +3,12 @@ import * as path from 'path';
 import readGames from '../utils/readGames.mjs';
 
 const sourceFolders = {
-  'data/recent/OTB-HQ/otb_1800_chkmt': { endsWithMate: true },
-  'data/recent/OTB-HQ/otb_all_stlmt': { endsWithStall: true },
-  'data/recent/Engines/eng_chkmt_2000+_novar': { endsWithMate: true },
-  'data/recent/Engines/eng_stlmt_novar': { endsWithStall: true },
+  // 'data/html/OTB-HQ/otb_1800_chkmt': { endsWithMate: true },
+  // 'data/html/OTB-HQ/otb_all_stlmt': { endsWithStall: true },
+  'data/html/Engines/eng_chkmt_2000+_novar': { endsWithMate: true },
+  'data/html/Engines/eng_stlmt_novar': { endsWithStall: true },
 };
-const destFolder = 'data/records';
+const destFolder = 'data/records_engines';
 const movesFile = 'possibleMoves.csv';
 const endsWithMate = true;
 const endsWithStall = false;

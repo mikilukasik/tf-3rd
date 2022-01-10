@@ -153,15 +153,49 @@ const getResult = ({ lines, fileName }) => {
   }
 };
 
+const validateLengths = ({ result: gameResult, fens, moves, fileName }) => {
+  let result = true;
+  if (gameResult === 0) return result;
+
+  if (gameResult === -1) {
+    if (fens.length % 2 === 0) {
+      console.warn(`invalid fen length in ${fileName}`);
+      result = false;
+    }
+
+    if (moves.length % 2 === 1) {
+      console.warn(`invalid moves length in ${fileName}`);
+      result = false;
+    }
+    return result;
+  }
+
+  if (gameResult === 1) {
+    if (fens.length % 2 === 1) {
+      console.warn(`invalid fen length in ${fileName}`);
+      result = false;
+    }
+
+    if (moves.length % 2 === 0) {
+      console.warn(`invalid moves length in ${fileName}`);
+      result = false;
+    }
+    return result;
+  }
+
+  console.warn(`invalid result in ${fileName}`);
+  return false;
+};
+
 const processHtml = async ({ htmlContent, fileName, updatePossibleMovesList, endsWithMate, endsWithStall }) => {
   const lines = htmlContent.split('\n');
-  const result = getResult({ lines, fileName });
-
   const fenLines = getFenLines({ lines });
-  const fens = await processFenLines({ fenLines, fileName });
-
   const moveLines = getMoveLines({ lines });
+
+  const result = getResult({ lines, fileName });
+  const fens = await processFenLines({ fenLines, fileName });
   const moves = await processMoveLines({ moveLines, fileName, updatePossibleMovesList });
+  if (!validateLengths({ result, fens, moves, fileName })) return null;
 
   const records = getRecords({ fens, moves, result, endsWithMate, endsWithStall, fileName });
 
@@ -187,18 +221,20 @@ const getCachedGame = async ({ fileName, folderName }) => {
   }
 };
 
+// alphazero's valuation https://arxiv.org/pdf/2009.04374.pdf
 const pieceValues = {
   p: -1,
-  b: -3,
-  n: -3,
-  r: -5,
-  q: -9,
+  b: -3.33,
+  n: -3.05,
+  r: -5.63,
+  q: -9.5,
   P: 1,
-  B: 3,
-  N: 3,
-  R: 5,
-  Q: 9,
+  B: 3.33,
+  N: 3.05,
+  R: 5.63,
+  Q: 9.5,
 };
+
 const getBalance = ({ fen }) =>
   fen
     .split(' ')[0]
@@ -269,6 +305,7 @@ const readGames = async ({ folderNames, skip = 0, limit, movesFile: _movesFile =
   console.log(`Found ${validFilesCount} valid files out of ${allFilesArray.length} total files.`);
 
   let fileIndex = skip;
+
   const getNextGame = async () => {
     const fileObject = validFilesArray[fileIndex++];
     if (!fileObject || (limit && fileIndex - skip > limit)) return { game: null, gameIndex: null };
@@ -277,6 +314,7 @@ const readGames = async ({ folderNames, skip = 0, limit, movesFile: _movesFile =
 
     const cached = await getCachedGame({ fileName, folderName });
     if (cached) {
+      if (!validateLengths({ ...cached, fileName })) return getNextGame();
       return { gameIndex: fileIndex - 1, game: cached, fileName, totalGames: validFilesCount };
     }
 
@@ -284,6 +322,8 @@ const readGames = async ({ folderNames, skip = 0, limit, movesFile: _movesFile =
     const game = await processHtml({ htmlContent, fileName, updatePossibleMovesList, endsWithMate, endsWithStall });
 
     await cacheGame({ game, fileName, folderName });
+
+    if (htmlContent && !game) return getNextGame();
 
     return { gameIndex: fileIndex - 1, game, fileName, totalGames: validFilesCount };
   };

@@ -4,19 +4,22 @@ const path = require('path');
 const { fen2flatArray } = require('./transform');
 // require('@tensorflow/tfjs-backend-wasm');
 
-const datasetDirName = 'data/datasets/all_frontSpread_cm+sm_noResign_noDrawSmOnly';
-const modelDirName = 'models/65M_cm+sm_noResign_c32t-d32l-t';
-const filesPerDataset = 10;
+const datasetDirName = 'data/datasets/engines_frontSpread_cm+sm_noResign_noDrawSmOnly';
+const _modelDirName = 'models/102_paralell';
+
+const filesPerDataset = 5;
 const outUnits = 1;
 const castlingIndex = 7;
 const enPassantIndex = 0; //8;
 const inputLength = 7 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
-const batchSize = 1000;
-const epochsValue = 5;
-const patience = 2;
+const batchSize = 500;
+const epochsValue = 15;
+const patience = 1;
 const startTime = Date.now();
 
-const tensorsToDispose = [];
+const modelDirName = `${_modelDirName}-cai${castlingIndex}eni${enPassantIndex}-ep${epochsValue}`;
+
+// const tensorsToDispose = [];
 let sourceCode;
 let transformCode;
 let trainingMeta = {};
@@ -71,9 +74,15 @@ const conv = (filters, activation, kernelSize = 8) =>
 const buildModel = function () {
   const input = tf.input({ shape: [8, 8, inputLength] });
 
-  const conv1 = conv(32, 'tanh').apply(input);
-  const flat1 = tf.layers.flatten().apply(conv1);
-  const dense2 = tf.layers.dense({ units: 32, activation: 'linear' }).apply(flat1);
+  const conv1 = conv(34, 'tanh').apply(input);
+  const flat2 = tf.layers.flatten().apply(conv1);
+  const dense3 = tf.layers.dense({ units: 512, activation: 'tanh' }).apply(flat2);
+
+  const flat1 = tf.layers.flatten().apply(input);
+  const dense1 = tf.layers.dense({ units: 512, activation: 'tanh' }).apply(flat1);
+
+  const concat = tf.layers.concatenate().apply([dense1, dense3]);
+  const dense2 = tf.layers.dense({ units: 384, activation: 'tanh' }).apply(concat);
 
   const output = tf.layers.dense({ units: outUnits, activation: 'tanh' }).apply(dense2);
 
@@ -110,26 +119,27 @@ const transformRecord = (record) => {
 
   const xs = fen2flatArray({ fenStr: fen, inputLength, castlingIndex, enPassantIndex });
 
-  if (isStrart || isStall) return { xs, ys: [0] };
-  if (isMate) return { xs, ys: [result] };
+  // if (isStall) return { xs, ys: [0] };
+  // if (isMate) return { xs, ys: [result] };
 
-  const resultScore = result / (fensLength - fenIndex - 1);
+  const progress = fenIndex / (fensLength - 1);
+  const curve = Math.pow(progress - 1, 3) / 2 + 0.5;
+  const resultScore = result * curve;
 
-  const balanceFiller = result * 50;
+  // const balanceFiller = result * 50;
 
-  const balanceScore =
-    balancesAhead
-      .concat(Array(30).fill(balanceFiller))
-      .slice(0, 30)
-      .reduce((p, c, i) => {
-        if (i % 2 === 1) return p;
-        return p + c / Math.pow(2, i / 2);
-      }, 0) / 100;
+  // const balanceScore =
+  //   balancesAhead
+  //     .concat(Array(22).fill(balanceFiller))
+  //     .slice(1, 20)
+  //     .reduce((p, c, i) => {
+  //       // if (i % 2 === 1) return p;
+  //       return p + c / Math.pow(2, i);
+  //     }, 0) / 100;
 
-  const ys = [(3 * balanceScore + resultScore) / 4];
+  const ys = [resultScore];
 
-  if (ys[0] < -1 || ys[0] > 1)
-    console.warn({ balanceScore, balancesAhead, result, b: balancesAhead.concat(Array(30).fill(balanceFiller)) });
+  if (ys[0] < -1 || ys[0] > 1) console.warn({ balancesAhead, result });
 
   return { xs, ys };
 };
@@ -140,7 +150,7 @@ const loadData = function (data) {
     xs = tf.tensor(xs, [8, 8, inputLength]);
     ys = tf.tensor1d(ys);
 
-    tensorsToDispose.push(xs, ys);
+    // tensorsToDispose.push(xs, ys);
     return {
       xs,
       ys,
@@ -188,13 +198,17 @@ const trainModel = async function ({ model, trainData, epochs = epochsValue, ite
             speed,
             remainingHours: remainingHours.toFixed(2),
             totalRemainingHours: totalRemainingHours.toFixed(2),
+            _modelDirName,
           });
         },
       }),
     ],
   };
 
-  return await model.fitDataset(trainData, options);
+  console.log(tf.memory());
+  const result = await model.fitDataset(trainData, options);
+  console.log(tf.memory());
+  return result;
 };
 
 // verify the model against the test data
@@ -209,6 +223,7 @@ const evaluateModel = async function ({ model, testData, tempFolder }) {
       .join(', '),
   );
 
+  model.summary();
   const result = { loss, meanAbsoluteError };
   console.log(result);
   await fs.writeFile(
@@ -256,6 +271,7 @@ const saveTestData = async ({ testData, iterationIndex }) =>
   fs.writeFile(path.resolve(trainingMeta.testDataFolder, `i${iterationIndex}.json`), JSON.stringify(testData), 'utf8');
 
 const runIteration = async ({ model, iterationIndex }) => {
+  // tf.engine().startScope();
   const iterationStart = Date.now();
 
   const tempFolder = path.resolve(modelDirName, iterationStart.toString());
@@ -306,15 +322,17 @@ const runIteration = async ({ model, iterationIndex }) => {
   });
 
   await saveTestData({ testData: rawTestData, iterationIndex });
-  tensorsToDispose.forEach((t) => {
-    try {
-      t.dispose();
-    } catch (e) {
-      /* */
-    }
-  });
-  tensorsToDispose.length = 0;
 
+  // tensorsToDispose.forEach((t) => {
+  //   try {
+  //     t.dispose();
+  //   } catch (e) {
+  //     /* */
+  //   }
+  // });
+  // tensorsToDispose.length = 0;
+
+  // tf.engine().endScope();
   return { finished: false };
 };
 

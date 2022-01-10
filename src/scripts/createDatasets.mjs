@@ -2,8 +2,8 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import readRecords from '../utils/readRecords.mjs';
 
-const sourceFolder = 'data/records';
-const destFolder = 'data/datasets/all_frontSpread_cm+sm_noResign_noDrawSmOnly';
+const sourceFolder = 'data/records_engines';
+const destFolder = 'data/datasets/engines_frontSpread_cm+sm_noResign_noDrawSmOnly';
 const minBatchLength = 100000;
 
 const pad = (_num, size) => {
