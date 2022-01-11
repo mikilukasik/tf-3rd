@@ -5,16 +5,16 @@ const { fen2flatArray } = require('./transform');
 // require('@tensorflow/tfjs-backend-wasm');
 
 const datasetDirName = 'data/datasets/engines_frontSpread_cm+sm_noResign_noDrawSmOnly';
-const _modelDirName = 'models/106_depth4_paralell';
+const _modelDirName = 'models/109_smoothAhead_from+2moves_c17t_d544t_d68t';
 
-const filesPerDataset = 6;
+const filesPerDataset = 10;
 const outUnits = 1;
 const castlingIndex = 7;
 const enPassantIndex = 0; //8;
 const inputLength = 7 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
-const batchSize = 600;
-const epochsValue = 15;
-const patience = 1;
+const batchSize = 1000;
+const epochsValue = 25;
+const patience = 2;
 const startTime = Date.now();
 
 const modelDirName = `${_modelDirName}-cai${castlingIndex}eni${enPassantIndex}-ep${epochsValue}`;
@@ -74,17 +74,12 @@ const conv = (filters, activation, kernelSize = 8) =>
 const buildModel = function () {
   const input = tf.input({ shape: [8, 8, inputLength] });
 
-  const conv1 = conv(34, 'tanh').apply(input);
-  const flat2 = tf.layers.flatten().apply(conv1);
-  const dense3 = tf.layers.dense({ units: 512, activation: 'tanh' }).apply(flat2);
+  const conv1 = conv(17, 'tanh').apply(input);
+  const flat1 = tf.layers.flatten().apply(conv1);
+  const dense2 = tf.layers.dense({ units: 544, activation: 'tanh' }).apply(flat1);
+  const dense3 = tf.layers.dense({ units: 68, activation: 'tanh' }).apply(dense2);
 
-  const flat1 = tf.layers.flatten().apply(input);
-  const dense1 = tf.layers.dense({ units: 512, activation: 'tanh' }).apply(flat1);
-
-  const concat = tf.layers.concatenate().apply([dense1, dense3]);
-  const dense2 = tf.layers.dense({ units: 384, activation: 'tanh' }).apply(concat);
-
-  const output = tf.layers.dense({ units: outUnits, activation: 'tanh' }).apply(dense2);
+  const output = tf.layers.dense({ units: outUnits, activation: 'tanh' }).apply(dense3);
 
   // compile the model
   const model = tf.model({ inputs: input, outputs: output });
@@ -95,6 +90,23 @@ const buildModel = function () {
   });
 
   return model;
+};
+
+const smoothen = (arr) => {
+  const smoothArr = arr.slice();
+
+  let i = 0;
+  while (i++ < arr.length - 2) {
+    if (Math.abs(arr[i - 1] - arr[i + 1]) < 75) smoothArr[i] = (arr[i - 1] + arr[i + 1]) / 2;
+  }
+
+  return smoothArr;
+};
+
+const getBalanceScore = ({ result, balancesAhead }) => {
+  const balanceFiller = result * 5000;
+  const smootherBalancesArray = smoothen(balancesAhead.concat(Array(30).fill(balanceFiller)));
+  return smootherBalancesArray.slice(2, 30).reduce((p, c, i) => p + c / Math.pow(2, i), 0) / 10000;
 };
 
 const transformRecord = (record) => {
@@ -119,26 +131,13 @@ const transformRecord = (record) => {
 
   const xs = fen2flatArray({ fenStr: fen, inputLength, castlingIndex, enPassantIndex });
 
-  // if (isStall) return { xs, ys: [0] };
+  if (isStrart || isStall) return { xs, ys: [0] };
   // if (isMate) return { xs, ys: [result] };
 
-  // const progress = fenIndex / (fensLength - 1);
-  // const curve = Math.pow(progress - 1, 3) / 2 + 0.5;
-  // const resultScore = result * curve;
-  // const resultScore = result * progress;
+  // const resultScore = result / (fensLength - fenIndex - 1);
 
-  const balanceFiller = result * 50;
-
-  // const balanceScore =
-  //   balancesAhead
-  //     .concat(Array(22).fill(balanceFiller))
-  //     .slice(1, 20)
-  //     .reduce((p, c, i) => {
-  //       // if (i % 2 === 1) return p;
-  //       return p + c / Math.pow(2, i);
-  //     }, 0) / 100;
-
-  const ys = [balancesAhead.concat(Array(4).fill(balanceFiller))[4] / 50];
+  const balanceScore = getBalanceScore({ result, balancesAhead });
+  const ys = [balanceScore];
 
   if (ys[0] < -1 || ys[0] > 1) console.warn({ balancesAhead, result });
 
@@ -307,7 +306,9 @@ const runIteration = async ({ model, iterationIndex }) => {
 
   const iterationFolderName = tempFolder.replace(
     iterationStart.toString(),
-    `${meanAbsoluteError}-s${(samplesLearned / 1000000).toFixed(2)}M-e${epochsValue}-${iterationStart.toString()}`,
+    `${_modelDirName.split('/').pop()}-${meanAbsoluteError}-s${(samplesLearned / 1000000).toFixed(
+      2,
+    )}M-e${epochsValue}-${iterationStart.toString()}`,
   );
   await fs.rename(tempFolder, iterationFolderName);
 
@@ -364,6 +365,9 @@ const init = async () => {
 
     const fullModelDirname = path.resolve(modelDirName);
     await fs.mkdir(fullModelDirname, { recursive: true });
+    await fs.writeFile(path.resolve(fullModelDirname, 'source.js'), sourceCode, 'utf8');
+    await fs.writeFile(path.resolve(fullModelDirname, 'transform.js'), transformCode, 'utf8');
+    await fs.writeFile(path.resolve(fullModelDirname, 'constants.json'), JSON.stringify(constants, null, 2), 'utf8');
 
     const testDataFolder = path.resolve(fullModelDirname, 'testDataUsed');
     await fs.mkdir(testDataFolder, { recursive: true });
@@ -373,7 +377,7 @@ const init = async () => {
 
     allDatasetFiles = (await fs.readdir(datasetDirName))
       .filter((fileName) => !trainingMeta.filesLearned.includes(fileName))
-      .sort((a, b) => Number(b.split('-')[1]) - Number(a.split('-')[1]));
+      .sort((a, b) => Number(b.split('-')[0]) - Number(a.split('-')[0]));
   } catch (e) {
     console.error(e);
   }
