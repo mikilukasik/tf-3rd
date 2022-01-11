@@ -236,36 +236,44 @@ const pieceValues = {
 };
 
 const getBalance = ({ fen }) =>
-  fen
-    .split(' ')[0]
-    .split('')
-    .reduce((p, c) => p + (pieceValues[c] || 0), 0);
+  Math.round(
+    fen
+      .split(' ')[0]
+      .split('')
+      .reduce((p, c) => p + (pieceValues[c] || 0), 0) * 100,
+  );
 
 const getRecords = ({ fens, result, moves, endsWithMate, endsWithStall, fileName }) => {
   const fensLength = fens.length;
 
-  const records = fens.map((fen, fenIndex) => {
-    const isLast = fenIndex === fensLength - 1;
-    const balance = getBalance({ fen });
+  const records = fens
+    .map((fen, fenIndex) => {
+      const isLast = fenIndex === fensLength - 1;
+      // if (endsWithStall && !isLast) return null;
 
-    return {
-      fen,
-      result,
-      wNext: fenIndex % 2 === 0,
-      nextMove: moves[fenIndex],
-      prevMove: moves[fenIndex - 1],
-      nextFen: fens[fenIndex + 1],
-      prevFen: fens[fenIndex - 1],
-      fenIndex: fenIndex,
-      isStrart: fenIndex === 0,
-      fensLength,
-      isMate: endsWithMate && isLast,
-      isStall: endsWithStall && isLast,
-      balance,
-      balancesAhead: [balance],
-      fileName,
-    };
-  });
+      const balance = getBalance({ fen });
+
+      return {
+        fen,
+        result,
+        wNext: fenIndex % 2 === 0,
+        nextMove: moves[fenIndex],
+        prevMove: moves[fenIndex - 1],
+        nextFen: fens[fenIndex + 1],
+        prevFen: fens[fenIndex - 1],
+        fenIndex: fenIndex,
+        isStrart: fenIndex === 0,
+        fensLength,
+        isMate: endsWithMate && isLast,
+        isStall: endsWithStall && isLast,
+        balance,
+        balancesAhead: [balance],
+        fileName,
+        endsWithMate,
+        endsWithStall,
+      };
+    })
+    .filter(Boolean);
 
   let recordIndex = fensLength - 1;
   while (recordIndex--) records[recordIndex].balancesAhead.push(...records[recordIndex + 1].balancesAhead);

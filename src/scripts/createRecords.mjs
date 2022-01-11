@@ -40,9 +40,9 @@ const { processRecord, writeCache } = (() => {
   };
 
   const processRecord = async (record) => {
-    const { fen, result, isMate, isStall, balance } = record;
+    const { fen, result, balance } = record;
 
-    const category = isMate ? 'mate' : isStall ? 'stall' : balance.toString();
+    const category = Math.round(balance / 100).toString();
     const folder = path.resolve(destFolder, category, result.toString(), fen.split(' ')[1]);
 
     await ensureDir(folder);
@@ -77,7 +77,7 @@ const run = async () => {
       await processRecord(record);
     }
 
-    if (gameIndex % 1000 === 0) console.log(`${gameIndex + 1} / ${totalGames}`);
+    if (gameIndex % 100 === 0) console.log(`${gameIndex + 1} / ${totalGames}`);
   }
 
   await writeCache();

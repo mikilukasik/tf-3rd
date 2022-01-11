@@ -5,14 +5,14 @@ const { fen2flatArray } = require('./transform');
 // require('@tensorflow/tfjs-backend-wasm');
 
 const datasetDirName = 'data/datasets/engines_frontSpread_cm+sm_noResign_noDrawSmOnly';
-const _modelDirName = 'models/102_paralell';
+const _modelDirName = 'models/106_depth4_paralell';
 
-const filesPerDataset = 5;
+const filesPerDataset = 6;
 const outUnits = 1;
 const castlingIndex = 7;
 const enPassantIndex = 0; //8;
 const inputLength = 7 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
-const batchSize = 500;
+const batchSize = 600;
 const epochsValue = 15;
 const patience = 1;
 const startTime = Date.now();
@@ -122,11 +122,12 @@ const transformRecord = (record) => {
   // if (isStall) return { xs, ys: [0] };
   // if (isMate) return { xs, ys: [result] };
 
-  const progress = fenIndex / (fensLength - 1);
-  const curve = Math.pow(progress - 1, 3) / 2 + 0.5;
-  const resultScore = result * curve;
+  // const progress = fenIndex / (fensLength - 1);
+  // const curve = Math.pow(progress - 1, 3) / 2 + 0.5;
+  // const resultScore = result * curve;
+  // const resultScore = result * progress;
 
-  // const balanceFiller = result * 50;
+  const balanceFiller = result * 50;
 
   // const balanceScore =
   //   balancesAhead
@@ -137,7 +138,7 @@ const transformRecord = (record) => {
   //       return p + c / Math.pow(2, i);
   //     }, 0) / 100;
 
-  const ys = [resultScore];
+  const ys = [balancesAhead.concat(Array(4).fill(balanceFiller))[4] / 50];
 
   if (ys[0] < -1 || ys[0] > 1) console.warn({ balancesAhead, result });
 

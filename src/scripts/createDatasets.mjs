@@ -36,7 +36,7 @@ const run = async () => {
     totalRecords += batch.length;
 
     await fs.writeFile(
-      path.resolve(destFolder, `${fileIndex}-${pad(fileIndex, 4)}-${(batch.length / 1000).toFixed(0)}k.json`),
+      path.resolve(destFolder, `${pad(fileIndex, 4)}-s${batch.length}.json`),
       JSON.stringify(batch),
       'utf8',
     );
