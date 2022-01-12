@@ -5,9 +5,9 @@ const { fen2flatArray } = require('./transform');
 // require('@tensorflow/tfjs-backend-wasm');
 
 const datasetDirName = 'data/datasets/engines_frontSpread_cm+sm_noResign_noDrawSmOnly';
-const _modelDirName = 'models/109_smoothAhead_from+2moves_c17t_d544t_d68t';
+const _modelDirName = 'models/116_norm';
 
-const filesPerDataset = 10;
+const filesPerDataset = 2;
 const outUnits = 1;
 const castlingIndex = 7;
 const enPassantIndex = 0; //8;
@@ -76,10 +76,9 @@ const buildModel = function () {
 
   const conv1 = conv(17, 'tanh').apply(input);
   const flat1 = tf.layers.flatten().apply(conv1);
-  const dense2 = tf.layers.dense({ units: 544, activation: 'tanh' }).apply(flat1);
-  const dense3 = tf.layers.dense({ units: 68, activation: 'tanh' }).apply(dense2);
+  const dense2 = tf.layers.dense({ units: 34, activation: 'linear' }).apply(flat1);
 
-  const output = tf.layers.dense({ units: outUnits, activation: 'tanh' }).apply(dense3);
+  const output = tf.layers.dense({ units: outUnits, activation: 'tanh' }).apply(dense2);
 
   // compile the model
   const model = tf.model({ inputs: input, outputs: output });
@@ -105,8 +104,12 @@ const smoothen = (arr) => {
 
 const getBalanceScore = ({ result, balancesAhead }) => {
   const balanceFiller = result * 5000;
-  const smootherBalancesArray = smoothen(balancesAhead.concat(Array(30).fill(balanceFiller)));
-  return smootherBalancesArray.slice(2, 30).reduce((p, c, i) => p + c / Math.pow(2, i), 0) / 10000;
+  const smootherBalancesArray = smoothen(balancesAhead.slice(2).concat(Array(30).fill(balanceFiller)));
+  return smootherBalancesArray.slice(0, 30).reduce((p, c, i) => p + c / Math.pow(1.5, i), 0) / 15000;
+
+  // a=(l,x)=>Array(l).fill(1).reduce((p, c, i) => p + c / Math.pow(x, i), 0)
+  // a(833,1.5)
+  // 2.9999999999999987
 };
 
 const transformRecord = (record) => {
@@ -131,13 +134,11 @@ const transformRecord = (record) => {
 
   const xs = fen2flatArray({ fenStr: fen, inputLength, castlingIndex, enPassantIndex });
 
-  if (isStrart || isStall) return { xs, ys: [0] };
+  // if (isStrart || isStall) return { xs, ys: [0] };
   // if (isMate) return { xs, ys: [result] };
 
-  // const resultScore = result / (fensLength - fenIndex - 1);
-
-  const balanceScore = getBalanceScore({ result, balancesAhead });
-  const ys = [balanceScore];
+  // const balanceScore = getBalanceScore({ result, balancesAhead });
+  const ys = [balancesAhead[4] / 5000];
 
   if (ys[0] < -1 || ys[0] > 1) console.warn({ balancesAhead, result });
 
@@ -150,7 +151,6 @@ const loadData = function (data) {
     xs = tf.tensor(xs, [8, 8, inputLength]);
     ys = tf.tensor1d(ys);
 
-    // tensorsToDispose.push(xs, ys);
     return {
       xs,
       ys,
@@ -167,7 +167,7 @@ const trainModel = async function ({ model, trainData, epochs = epochsValue, ite
   // console.log
   const options = {
     epochs,
-    verbose: 0,
+    verbose: 1,
     callbacks: [
       tf.callbacks.earlyStopping({ monitor: 'meanAbsoluteError', patience }),
 
