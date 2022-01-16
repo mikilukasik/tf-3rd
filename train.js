@@ -5,16 +5,16 @@ const { fen2flatArray } = require('./transform');
 // require('@tensorflow/tfjs-backend-wasm');
 
 const datasetDirName = 'data/datasets/engines_frontSpread_cm+sm_noResign_noDrawSmOnly';
-const _modelDirName = 'models/116_norm';
+const _modelDirName = 'models/314_d2diff';
 
 const filesPerDataset = 2;
 const outUnits = 1;
-const castlingIndex = 7;
-const enPassantIndex = 0; //8;
-const inputLength = 7 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
+const castlingIndex = 13;
+const enPassantIndex = 0;
+const inputLength = 13 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
 const batchSize = 1000;
-const epochsValue = 25;
-const patience = 2;
+const epochsValue = 2;
+const patience = 1;
 const startTime = Date.now();
 
 const modelDirName = `${_modelDirName}-cai${castlingIndex}eni${enPassantIndex}-ep${epochsValue}`;
@@ -69,16 +69,31 @@ const conv = (filters, activation, kernelSize = 8) =>
     kernelSize,
     padding: 'same',
     activation,
+    useBias: false,
   });
 
 const buildModel = function () {
   const input = tf.input({ shape: [8, 8, inputLength] });
 
-  const conv1 = conv(17, 'tanh').apply(input);
-  const flat1 = tf.layers.flatten().apply(conv1);
-  const dense2 = tf.layers.dense({ units: 34, activation: 'linear' }).apply(flat1);
+  const conv1 = conv(17, 'linear').apply(input);
+  const norm1 = tf.layers.batchNormalization().apply(conv1);
+  const dense1 = tf.layers.leakyReLU({ units: 64, useBias: false }).apply(norm1);
+  // const norm1b = tf.layers.batchNormalization().apply(dense1);
 
-  const output = tf.layers.dense({ units: outUnits, activation: 'tanh' }).apply(dense2);
+  const conv2 = conv(17, 'linear').apply(dense1);
+  const norm2 = tf.layers.batchNormalization().apply(conv2);
+  const dense2 = tf.layers.leakyReLU({ units: 64, useBias: false }).apply(norm2);
+  // const norm2b = tf.layers.batchNormalization().apply(dense2);
+
+  const flat1 = tf.layers.flatten().apply(dense2);
+  const normo = tf.layers.batchNormalization().apply(flat1);
+  const denseo = tf.layers.leakyReLU({ units: 64, useBias: false }).apply(normo);
+
+  // const dense4 = tf.layers.leakyReLU({ units: 32, useBias: false }).apply(norm3);
+  // const norm4 = tf.layers.batchNormalization().apply(dense4);
+
+  // const output = tf.layers.leakyReLU({ units: outUnits, useBias: false }).apply(norm4);
+  const output = tf.layers.dense({ units: outUnits, activation: 'tanh', useBias: true }).apply(denseo);
 
   // compile the model
   const model = tf.model({ inputs: input, outputs: output });
@@ -111,6 +126,17 @@ const getBalanceScore = ({ result, balancesAhead }) => {
   // a(833,1.5)
   // 2.9999999999999987
 };
+const getBalanceScore2 = ({ result, balancesAhead }) => {
+  const balanceFiller = result * 5000;
+  // const smootherBalancesArray = smoothen(balancesAhead.slice(2).concat(Array(30).fill(balanceFiller)));
+  // return smootherBalancesArray.slice(0, 30).reduce((p, c, i) => p + c / Math.pow(1.5, i), 0) / 15000;
+  const arr = balancesAhead.concat(Array(5).fill(balanceFiller));
+  return (arr[2] - arr[0]) / 7500;
+
+  // a=(l,x)=>Array(l).fill(1).reduce((p, c, i) => p + c / Math.pow(x, i), 0)
+  // a(833,1.5)
+  // 2.9999999999999987
+};
 
 const transformRecord = (record) => {
   // console.log(22);
@@ -137,10 +163,11 @@ const transformRecord = (record) => {
   // if (isStrart || isStall) return { xs, ys: [0] };
   // if (isMate) return { xs, ys: [result] };
 
-  // const balanceScore = getBalanceScore({ result, balancesAhead });
-  const ys = [balancesAhead[4] / 5000];
+  const balanceScore = getBalanceScore2({ result, balancesAhead });
+  // console.log(balancesAhead[4], balancesAhead[4] / 500);
+  const ys = [balanceScore];
 
-  if (ys[0] < -1 || ys[0] > 1) console.warn({ balancesAhead, result });
+  if (ys[0] < -1 || ys[0] > 1) console.warn({ balancesAhead, result, ys });
 
   return { xs, ys };
 };
