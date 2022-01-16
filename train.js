@@ -5,15 +5,15 @@ const { fen2flatArray, getWhiteNextFen } = require('./transform');
 // require('@tensorflow/tfjs-backend-wasm');
 
 const datasetDirName = 'data/datasets/engines_frontSpread_cm+sm_noResign_noDrawSmOnly';
-const _modelDirName = 'models/330_flpRtat_d1diff';
+const _modelDirName = 'models/343_flp_d2';
 
-const filesPerDataset = 2;
+const filesPerDataset = 3;
 const outUnits = 1;
 const castlingIndex = 12;
 const enPassantIndex = 0;
 const inputLength = 12 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
 const batchSize = 1000;
-const epochsValue = 2;
+const epochsValue = 3;
 const patience = 1;
 const startTime = Date.now();
 const needsWNext = true;
@@ -77,12 +77,12 @@ const conv = (filters, activation, kernelSize = 8) =>
 const buildModel = function () {
   const input = tf.input({ shape: [8, 8, inputLength] });
 
-  const conv1 = conv(17, 'linear').apply(input);
+  const conv1 = conv(24, 'linear').apply(input);
   const norm1 = tf.layers.batchNormalization().apply(conv1);
   const dense1 = tf.layers.leakyReLU({ units: 64, useBias: false }).apply(norm1);
   // const norm1b = tf.layers.batchNormalization().apply(dense1);
 
-  const conv2 = conv(17, 'linear').apply(dense1);
+  const conv2 = conv(32, 'linear').apply(dense1);
   const norm2 = tf.layers.batchNormalization().apply(conv2);
   const dense2 = tf.layers.leakyReLU({ units: 64, useBias: false }).apply(norm2);
   // const norm2b = tf.layers.batchNormalization().apply(dense2);
@@ -119,10 +119,21 @@ const smoothen = (arr) => {
   return smoothArr;
 };
 
-const getBalanceScore = ({ result, balancesAhead }) => {
-  const balanceFiller = result * 5000;
-  const smootherBalancesArray = smoothen(balancesAhead.slice(2).concat(Array(30).fill(balanceFiller)));
-  return smootherBalancesArray.slice(0, 30).reduce((p, c, i) => p + c / Math.pow(1.5, i), 0) / 15000;
+const getBalanceScore = ({ result: _result, balancesAhead: _balancesAhead, mirrored }) => {
+  const balancesAhead = mirrored ? _balancesAhead.map((x) => -x) : _balancesAhead.slice();
+  const balanceDiffsAhead = balancesAhead.map((bal) => bal - balancesAhead[0]);
+
+  const result = _result * (mirrored ? -1 : 1);
+
+  const balanceFiller = result === 0 ? 0 : balanceDiffsAhead[balanceDiffsAhead.length - 1] + result * 2500;
+
+  // const smootherBalancesArray = smoothen(balancesAhead.slice(2).concat(Array(30).fill(balanceFiller)));
+  return (
+    balanceDiffsAhead
+      .concat(Array(30).fill(balanceFiller))
+      .slice(2, 30)
+      .reduce((p, c, i) => p + c / Math.pow(1.5, i), 0) / 15000
+  );
 
   // a=(l,x)=>Array(l).fill(1).reduce((p, c, i) => p + c / Math.pow(x, i), 0)
   // a(833,1.5)
@@ -173,7 +184,7 @@ const transformRecord = (record) => {
   // if (isStrart || isStall) return { xs, ys: [0] };
   // if (isMate) return { xs, ys: [result] };
 
-  const balanceScore = getBalanceScore2({ result, balancesAhead, mirrored });
+  const balanceScore = getBalanceScore({ result, balancesAhead, mirrored });
   // console.log(balancesAhead[4], balancesAhead[4] / 500);
   const ys = [balanceScore];
 
