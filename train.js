@@ -1,21 +1,22 @@
 const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs').promises;
 const path = require('path');
-const { fen2flatArray } = require('./transform');
+const { fen2flatArray, getWhiteNextFen } = require('./transform');
 // require('@tensorflow/tfjs-backend-wasm');
 
 const datasetDirName = 'data/datasets/engines_frontSpread_cm+sm_noResign_noDrawSmOnly';
-const _modelDirName = 'models/314_d2diff';
+const _modelDirName = 'models/330_flpRtat_d1diff';
 
 const filesPerDataset = 2;
 const outUnits = 1;
-const castlingIndex = 13;
+const castlingIndex = 12;
 const enPassantIndex = 0;
-const inputLength = 13 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
+const inputLength = 12 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
 const batchSize = 1000;
 const epochsValue = 2;
 const patience = 1;
 const startTime = Date.now();
+const needsWNext = true;
 
 const modelDirName = `${_modelDirName}-cai${castlingIndex}eni${enPassantIndex}-ep${epochsValue}`;
 
@@ -37,6 +38,7 @@ const constants = {
   patience,
   startTime,
   filesPerDataset,
+  needsWNext,
 };
 
 const saveTrainingMeta = () =>
@@ -126,12 +128,16 @@ const getBalanceScore = ({ result, balancesAhead }) => {
   // a(833,1.5)
   // 2.9999999999999987
 };
-const getBalanceScore2 = ({ result, balancesAhead }) => {
-  const balanceFiller = result * 5000;
+const getBalanceScore2 = ({ result: _result, balancesAhead: _balancesAhead, mirrored }) => {
+  const balancesAhead = mirrored ? _balancesAhead.map((x) => -x) : _balancesAhead.slice();
+  const result = _result * (mirrored ? -1 : 1);
+
+  const balanceFiller = result === 0 ? 0 : balancesAhead[balancesAhead.length - 1] + result * 2500;
+
   // const smootherBalancesArray = smoothen(balancesAhead.slice(2).concat(Array(30).fill(balanceFiller)));
   // return smootherBalancesArray.slice(0, 30).reduce((p, c, i) => p + c / Math.pow(1.5, i), 0) / 15000;
   const arr = balancesAhead.concat(Array(5).fill(balanceFiller));
-  return (arr[2] - arr[0]) / 7500;
+  return (arr[1] - arr[0]) / 6000;
 
   // a=(l,x)=>Array(l).fill(1).reduce((p, c, i) => p + c / Math.pow(x, i), 0)
   // a(833,1.5)
@@ -141,14 +147,14 @@ const getBalanceScore2 = ({ result, balancesAhead }) => {
 const transformRecord = (record) => {
   // console.log(22);
   const {
-    fen, // : "2q5/6p1/p3q3/P7/k7/8/3K4/8 b - -",
+    fen: _fen, // : "2q5/6p1/p3q3/P7/k7/8/3K4/8 b - -",
     result, // : 0,
     wNext, // : false,
     nextMove, // : "Kxa5",
     prevMove, // : "Kd2",
     nextFen, // : "2q5/6p1/p3q3/k7/8/8/3K4/8 w - -",
     prevFen, // : "2q5/6p1/p3q3/P7/k7/8/8/3K4 w - -",
-    fenIndex, // : 131,
+    fenIndex, // : 121,
     isStrart, // : false,
     isMate, // : false
     fensLength, // : 147,
@@ -158,12 +164,16 @@ const transformRecord = (record) => {
     fileName, // : "esn_6483.html"
   } = record;
 
+  const { fen, mirrored } = getWhiteNextFen({ fen: _fen });
+
+  // if (mirrored) return null;
+
   const xs = fen2flatArray({ fenStr: fen, inputLength, castlingIndex, enPassantIndex });
 
   // if (isStrart || isStall) return { xs, ys: [0] };
   // if (isMate) return { xs, ys: [result] };
 
-  const balanceScore = getBalanceScore2({ result, balancesAhead });
+  const balanceScore = getBalanceScore2({ result, balancesAhead, mirrored });
   // console.log(balancesAhead[4], balancesAhead[4] / 500);
   const ys = [balanceScore];
 
@@ -172,8 +182,88 @@ const transformRecord = (record) => {
   return { xs, ys };
 };
 
+const noMoreCastling = ({ fen }) => {
+  const castling = fen.split(' ')[2];
+  return castling === '-';
+};
+
+const noMorePawns = ({ fen }) => {
+  const board = fen.split(' ')[0];
+  const hasBlackPawns = board.indexOf('p') >= 0;
+  const hasWhitePawns = board.indexOf('P') >= 0;
+  return !(hasBlackPawns || hasWhitePawns);
+};
+
+const rowReverser = (row) => row.split('').reverse().join('');
+
+const mirrorOnX = (record) => {
+  const { fen } = record;
+  const [board, ...restOfFen] = fen.split(' ');
+
+  const newBoard = board.split('/').map(rowReverser).join('/');
+  return Object.assign({}, record, { fen: [newBoard, ...restOfFen].join(' ') });
+};
+
+const expandGroupedBlanks = (rowStr) => {
+  let result = rowStr;
+  for (const char of rowStr) if (Number(char)) result = result.replace(char, '1'.repeat(Number(char)));
+  return result;
+};
+
+const mergeBlanks = (rowStr) => rowStr.replace(/[1]+/g, (blanks) => blanks.length);
+
+const rotate90 = (record) => {
+  const { fen } = record;
+  const [board, ...restOfFen] = fen.split(' ');
+
+  const lines = board.split('/').map((line) => expandGroupedBlanks(line).split(''));
+
+  const newLines = [];
+  for (let i = 0; i < 8; i += 1) {
+    newLines[i] = [];
+    for (let j = 0; j < 8; j += 1) {
+      newLines[i][j] = lines[j][7 - i];
+    }
+  }
+
+  const newBoard = newLines.map((lineArr) => mergeBlanks(lineArr.join(''))).join('/');
+  return Object.assign({}, record, { fen: [newBoard, ...restOfFen].join(' ') });
+};
+
+const getRotatedRecords = (record) => {
+  const resultingRecords = [record];
+
+  for (let i = 0; i < 3; i += 1) {
+    const recordToRotate = resultingRecords[resultingRecords.length - 1];
+    resultingRecords.push(rotate90(recordToRotate));
+  }
+
+  return resultingRecords.slice(1);
+};
+
+const addFlippedAndRotated = (dataArr) => {
+  // TODO: do we need to touch prev/next fen?
+  const newDataArr = [];
+
+  for (const data of dataArr) {
+    const resultingRecords = [data];
+
+    if (noMoreCastling(data)) {
+      resultingRecords.push(mirrorOnX(data));
+      if (noMorePawns(data))
+        resultingRecords.push(...getRotatedRecords(resultingRecords[0]), ...getRotatedRecords(resultingRecords[1]));
+    }
+
+    newDataArr.push(...resultingRecords);
+  }
+
+  return newDataArr;
+};
+
 // load and normalize data
 const loadData = function (data) {
+  // const data = addFlippedAndRotated(_data);
+
   const transform = ({ xs, ys }) => {
     xs = tf.tensor(xs, [8, 8, inputLength]);
     ys = tf.tensor1d(ys);
@@ -312,8 +402,14 @@ const runIteration = async ({ model, iterationIndex }) => {
 
   const { trainData: rawTrainData, testData: rawTestData, filesLoaded, remainingFiles } = dataset;
 
-  const trainData = loadData(rawTrainData.map(transformRecord));
-  const testData = loadData(rawTestData.map(transformRecord));
+  const largeRawTrainData = addFlippedAndRotated(rawTrainData);
+  const largeRawTestData = addFlippedAndRotated(rawTestData);
+
+  const samplesAdded = largeRawTestData.length + largeRawTrainData.length - rawTestData.length - rawTrainData.length;
+  console.log(`Added ${samplesAdded} samples.`);
+
+  const trainData = loadData(largeRawTrainData.map(transformRecord).filter(Boolean));
+  const testData = loadData(largeRawTestData.map(transformRecord).filter(Boolean));
 
   const info = await trainModel({
     model,
