@@ -1,0 +1,19 @@
+{
+  "trainDatasetDirName": "data/datasets/1st_split/train",
+  "testDatasetDirName": "data/datasets/1st_split/test",
+  "modelDirName": "models/451_dx5",
+  "outUnits": 1,
+  "castlingIndex": 12,
+  "enPassantIndex": 0,
+  "inputLength": 13,
+  "batchSize": 1000,
+  "maxEpochs": 250,
+  "patience": 1,
+  "startTime": 1643888705481,
+  "trainFilesPerDataset": 100,
+  "testFilesCount": 20,
+  "needsWNext": true,
+  "needsPieceVals": true,
+  "learningRate": 0.00005,
+  "sourceModelDirName": "models/451_dx4/0.04164-e1-1643888642910"
+}
