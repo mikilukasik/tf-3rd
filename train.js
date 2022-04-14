@@ -2,10 +2,9 @@ const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs').promises;
 const path = require('path');
 const { fen2flatArray, getWhiteNextFen } = require('./transform');
-// require('@tensorflow/tfjs-backend-wasm');
 
 const datasetDirName = 'data/datasets/engines_frontSpread_cm+sm_noResign_noDrawSmOnly';
-const _modelDirName = 'models/343_flp_d2';
+const _modelDirName = 'models/451_d2-14';
 
 const filesPerDataset = 3;
 const outUnits = 1;
@@ -13,14 +12,14 @@ const castlingIndex = 12;
 const enPassantIndex = 0;
 const inputLength = 12 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
 const batchSize = 1000;
-const epochsValue = 3;
+const epochsValue = 25;
 const patience = 1;
 const startTime = Date.now();
 const needsWNext = true;
+const needsPieceVals = true;
 
-const modelDirName = `${_modelDirName}-cai${castlingIndex}eni${enPassantIndex}-ep${epochsValue}`;
+const modelDirName = `${_modelDirName}-e${epochsValue}`;
 
-// const tensorsToDispose = [];
 let sourceCode;
 let transformCode;
 let trainingMeta = {};
@@ -39,6 +38,7 @@ const constants = {
   startTime,
   filesPerDataset,
   needsWNext,
+  needsPieceVals,
 };
 
 const saveTrainingMeta = () =>
@@ -70,40 +70,43 @@ const conv = (filters, activation, kernelSize = 8) =>
     filters,
     kernelSize,
     padding: 'same',
-    activation,
+    // activation,
     useBias: false,
   });
+
+const convBlock = (input, filters = 32) => {
+  const conv1 = conv(filters).apply(input);
+  const activated = tf.layers.leakyReLU().apply(conv1);
+  return activated;
+};
 
 const buildModel = function () {
   const input = tf.input({ shape: [8, 8, inputLength] });
 
-  const conv1 = conv(24, 'linear').apply(input);
-  const norm1 = tf.layers.batchNormalization().apply(conv1);
-  const dense1 = tf.layers.leakyReLU({ units: 64, useBias: false }).apply(norm1);
-  // const norm1b = tf.layers.batchNormalization().apply(dense1);
+  const conv1 = convBlock(input, 32);
+  const conv2 = convBlock(conv1, 32);
+  const conv3 = convBlock(conv2, 32);
 
-  const conv2 = conv(32, 'linear').apply(dense1);
-  const norm2 = tf.layers.batchNormalization().apply(conv2);
-  const dense2 = tf.layers.leakyReLU({ units: 64, useBias: false }).apply(norm2);
-  // const norm2b = tf.layers.batchNormalization().apply(dense2);
+  // const flat1 = tf.layers.flatten().apply(conv1);
+  // const flat2 = tf.layers.flatten().apply(conv2);
+  const flat3 = tf.layers.flatten().apply(conv3);
 
-  const flat1 = tf.layers.flatten().apply(dense2);
-  const normo = tf.layers.batchNormalization().apply(flat1);
-  const denseo = tf.layers.leakyReLU({ units: 64, useBias: false }).apply(normo);
+  // const concatenated1 = tf.layers.concatenate().apply([flat3, flat2]);
+  // const norm1 = tf.layers.batchNormalization().apply(concatenated1);
+  const dense1 = tf.layers.dense({ units: 512, activation: tf.leakyReLU, useBias: false }).apply(flat3);
+  const dense2 = tf.layers.dense({ units: 256, activation: tf.leakyReLU, useBias: false }).apply(dense1);
 
-  // const dense4 = tf.layers.leakyReLU({ units: 32, useBias: false }).apply(norm3);
-  // const norm4 = tf.layers.batchNormalization().apply(dense4);
-
-  // const output = tf.layers.leakyReLU({ units: outUnits, useBias: false }).apply(norm4);
-  const output = tf.layers.dense({ units: outUnits, activation: 'tanh', useBias: true }).apply(denseo);
+  const output = tf.layers.dense({ units: outUnits, useBias: false }).apply(dense2);
 
   // compile the model
   const model = tf.model({ inputs: input, outputs: output });
   model.compile({
-    optimizer: 'adam',
+    optimizer: tf.train.adam(0.00015),
     loss: 'meanSquaredError',
     metrics: [tf.metrics.meanAbsoluteError],
   });
+
+  // console.log(model, model.learningRate);
 
   return model;
 };
@@ -128,12 +131,17 @@ const getBalanceScore = ({ result: _result, balancesAhead: _balancesAhead, mirro
   const balanceFiller = result === 0 ? 0 : balanceDiffsAhead[balanceDiffsAhead.length - 1] + result * 2500;
 
   // const smootherBalancesArray = smoothen(balancesAhead.slice(2).concat(Array(30).fill(balanceFiller)));
-  return (
-    balanceDiffsAhead
-      .concat(Array(30).fill(balanceFiller))
-      .slice(2, 30)
-      .reduce((p, c, i) => p + c / Math.pow(1.5, i), 0) / 15000
-  );
+  const extendedArr = balanceDiffsAhead.concat(Array(16).fill(balanceFiller)).slice(2, 14);
+  const smootherBalancesArray = smoothen(extendedArr);
+
+  return smootherBalancesArray.reduce((p, c, i) => p + c / Math.pow(1.25, i), 0) / 25000;
+
+  // return (
+  //   balanceDiffsAhead
+  //     .concat(Array(30).fill(balanceFiller))
+  //     .slice(2, 30)
+  //     .reduce((p, c, i) => p + c / Math.pow(1.5, i), 0) / 15000
+  // );
 
   // a=(l,x)=>Array(l).fill(1).reduce((p, c, i) => p + c / Math.pow(x, i), 0)
   // a(833,1.5)
@@ -459,14 +467,12 @@ const runIteration = async ({ model, iterationIndex }) => {
 
   await saveTestData({ testData: rawTestData, iterationIndex });
 
-  // tensorsToDispose.forEach((t) => {
   //   try {
   //     t.dispose();
   //   } catch (e) {
   //     /* */
   //   }
   // });
-  // tensorsToDispose.length = 0;
 
   // tf.engine().endScope();
   return { finished: false };
