@@ -1,14 +1,10 @@
+// const fs = require('fs').promises;
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { MongoClient } from 'mongodb';
-import { addTestDataSwitch } from './utils/addTestDataSwitch.mjs';
-import { addV1Output } from './utils/addV1Output.mjs';
-import { addWNextFen } from './utils/addWNextFen.mjs';
-import pkg1 from '../utils/stockfish_worker.js';
-const { getStockfishSearchScore, getMovedFen } = pkg1;
 
 const BATCH_SIZE = 100;
-const parentFolder = 'data/html/5';
+const folderNames = ['data/html/hm124-128', 'data/html/hm129-133', 'data/html/hm134-139'];
 
 const client = new MongoClient('mongodb://0.0.0.0:27017');
 let db;
@@ -104,10 +100,15 @@ const processFenLines = async ({ fenLines, fileName }) => {
       : '-';
 
     const newFen = `${fenStr} ${wasWhitesMove ? 'b' : 'w'} ${castlingStr || '-'} ${ept}`;
+    // const stockfishScores = {
+    //   eval: await getStockfishEvalScore(newFen),
+    //   // search: await getStockfishSearchScore(newFen),
+    // };
+
     processedFenLines.push(newFen);
   }
 
-  return processedFenLines.filter(Boolean);
+  return processedFenLines;
 };
 
 const processMoveLines = async ({ moveLines, fileName }) => {
@@ -179,7 +180,41 @@ const getResult = ({ lines, fileName }) => {
   }
 };
 
-const processHtml = async ({ htmlContent, fileName, folderName }) => {
+// const validateLengths = ({ result: gameResult, fens, moves, fileName }) => {
+//   let result = true;
+//   if (gameResult === 0) return result;
+
+//   if (gameResult === -1) {
+//     if (fens.length % 2 === 0) {
+//       console.warn(`invalid fen length in ${fileName}`);
+//       result = false;
+//     }
+
+//     if (moves.length % 2 === 1) {
+//       console.warn(`invalid moves length in ${fileName}`);
+//       result = false;
+//     }
+//     return result;
+//   }
+
+//   if (gameResult === 1) {
+//     if (fens.length % 2 === 1) {
+//       console.warn(`invalid fen length in ${fileName}`);
+//       result = false;
+//     }
+
+//     if (moves.length % 2 === 0) {
+//       console.warn(`invalid moves length in ${fileName}`);
+//       result = false;
+//     }
+//     return result;
+//   }
+
+//   console.warn(`invalid result in ${fileName}`);
+//   return false;
+// };
+
+const processHtml = async ({ htmlContent, fileName }) => {
   try {
     const lines = htmlContent.split('\n');
     const fenLines = getFenLines({ lines });
@@ -187,25 +222,14 @@ const processHtml = async ({ htmlContent, fileName, folderName }) => {
     const players = getPlayers({ lines });
     const event = getEvent({ lines });
 
-    const origResult = getResult({ lines, fileName });
+    const result = getResult({ lines, fileName });
     const fens = await processFenLines({ fenLines, fileName });
     const moves = await processMoveLines({ moveLines, fileName });
+    // if (!validateLengths({ result, fens, moves, fileName })) return null;
 
-    const { records, result, fensAdded } = await getRecords({ fens, origResult, fileName });
+    const records = getRecords({ fens, result });
 
-    return {
-      origResult,
-      result,
-      records,
-      fens,
-      moves,
-      players,
-      event,
-      fileName,
-      folderName,
-      fensAdded,
-      newBatch: true,
-    };
+    return { result, records, fens, moves, htmlContent, players, event, fileName };
   } catch (e) {
     console.error(e);
     console.log({ fileName });
@@ -235,69 +259,47 @@ const getBalance = ({ fen }) =>
       .reduce((p, c) => p + (pieceValues[c] || 0), 0) * 100,
   );
 
-const finishGame = async ({ fens, origResult, fileName }) => {
-  let result = origResult;
-  const extendedFens = fens.slice();
-  let fensAdded = 0;
+const getRecords = ({ fens, result }) => {
+  const fensLength = fens.length;
 
-  if (result === 0) {
-    return { extendedFens, result, fensAdded };
-  }
+  const records = fens
+    .map((fen, fenIndex) => {
+      // const isLast = fenIndex === fensLength - 1;
+      // if (endsWithStall && !isLast) return null;
 
-  let fen = fens[fens.length - 1];
-  for (let i = 0; i < 150; i += 1) {
-    const { bestmove } = await getStockfishSearchScore(fen, 14);
-    if (!bestmove) {
-      const sideToMove = fen.split(' ')[1];
-      if ((sideToMove === 'w' && result !== -1) || (sideToMove === 'b' && result !== 1)) {
-        throw new Error(`result has changed r: ${origResult}, lastFen: ${fens[fens.length - 1]} fileName: ${fileName}`);
-      }
+      const balance = getBalance({ fen });
 
-      return { extendedFens, result, fensAdded };
-    }
+      return {
+        fen,
+        result,
+        // wNext: fenIndex % 2 === 0,
+        // nextMove: moves[fenIndex],
+        // prevMove: moves[fenIndex - 1],
+        // nextFen: fens[fenIndex + 1],
+        // prevFen: fens[fenIndex - 1],
+        progress: fenIndex / (fensLength - 1),
+        // fenIndex: fenIndex,
+        // isStrart: fenIndex === 0,
+        // fensLength,
 
-    fen = await getMovedFen(bestmove, fen);
-    extendedFens.push(fen);
-    fensAdded += 1;
-  }
+        balance,
+        balancesAhead: [balance],
 
-  throw new Error(`couldn't finish game in 150 moves r: ${origResult}, lastFen: ${fens[fens.length - 1]}`);
-};
-
-const getRecords = async ({ fens, origResult, fileName }) => {
-  const { extendedFens, result, fensAdded } = await finishGame({ fens, origResult, fileName });
-
-  const fensLength = extendedFens.length;
-
-  const records = extendedFens.map((fen, fenIndex) => {
-    const balance = getBalance({ fen });
-
-    return {
-      fen,
-      progress: fenIndex / (fensLength - 1),
-      balance,
-      balancesAhead: [balance],
-      rnds: getFilledArray(10).map(() => Math.random()),
-      // testData: Math.random() > 0.9, // 10%
-    };
-  });
+        rnds: getFilledArray(5).map(() => Math.random()),
+        // fileName,
+      };
+    })
+    .filter(Boolean);
 
   let recordIndex = fensLength - 1;
   while (recordIndex--) records[recordIndex].balancesAhead.push(...records[recordIndex + 1].balancesAhead);
 
-  const newRecords = records.map((record) => {
-    const recordWithTestSwitch = addTestDataSwitch({ record });
-    const recordWithWNextFen = addWNextFen({ record: recordWithTestSwitch, doc: { result } });
-    const recordWithWV1Output = addV1Output({ record: recordWithWNextFen });
-    return recordWithWV1Output;
-  });
-
-  return { records: newRecords, result, fensAdded };
+  return records;
 };
 
 const readGames = async () => {
-  const sourceDirs = (await fs.readdir(parentFolder)).map((fName) => path.resolve(parentFolder, fName));
-  console.log(`Reading .html files from ${sourceDirs.map((folderName) => folderName.split('/').pop()).join(', ')}...`);
+  const sourceDirs = folderNames.map((folderName) => path.resolve(folderName));
+  console.log(`Reading .html files from ${sourceDirs.map(({ folderName }) => folderName).join(', ')}...`);
 
   const allFilesArray = (
     await Promise.all(
@@ -322,36 +324,40 @@ const readGames = async () => {
 
     for (let index = 0; index < BATCH_SIZE; index += 1) {
       const fileObject = validFilesArray[fileIndex++];
-      if (!fileObject) break;
+      if (!fileObject) return null;
 
       const { fileName, folderName } = fileObject;
 
       const htmlContent = await fs.readFile(path.resolve(folderName, fileName), 'utf-8');
-      const game = await processHtml({ htmlContent, fileName, folderName });
+      const game = await processHtml({ htmlContent, fileName });
 
       if (htmlContent && !game) continue;
 
-      result.push({ gameIndex: fileIndex - 1, game, fileName, folderName });
+      result.push({ gameIndex: fileIndex - 1, game, fileName });
     }
 
-    return result;
+    return result.filter(Boolean);
   };
 
-  return { getNextGames, validFilesCount };
+  return getNextGames;
 };
 
 const run = async () => {
-  const { getNextGames, validFilesCount } = await readGames();
+  const getNextGames = await readGames();
   const collection = await getCollection('scidGames');
 
-  let processed = 0;
   for (let nextGames = await getNextGames(); nextGames && nextGames.length; nextGames = await getNextGames()) {
-    const mongoRecords = nextGames.map(({ game }) => game);
+    const mongoRecords = nextGames.map(({ game: { fileName, event, moves, records, players, result } }) => ({
+      fileName,
+      event,
+      moves,
+      records,
+      players,
+      result,
+    }));
 
     await collection.insertMany(mongoRecords);
-
-    processed += mongoRecords.length;
-    console.log(`processed ${processed} of ${validFilesCount} games.`);
+    process.stdout.write('.');
   }
 
   client.close();

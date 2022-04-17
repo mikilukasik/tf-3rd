@@ -28,6 +28,8 @@ module.exports = {
       };
 
       sf.onmessage = (msg) => {
+        // console.log(msg);
+
         result.messages.push(msg);
 
         if (msg.startsWith('info depth')) {
