@@ -1,6 +1,6 @@
 import { getCollection } from './getCollection.mjs';
 
-export const updateMongoDocs = async ({ collectionName, filters, updater, closeClient }) => {
+export const updateMongoDocs = async ({ collectionName, filters, updater, closeClient, logBatchSize = 100 }) => {
   const { collection, client } = await getCollection(collectionName);
   const cursor = collection.find(filters);
 
@@ -15,7 +15,7 @@ export const updateMongoDocs = async ({ collectionName, filters, updater, closeC
       erroredCount += 1;
     }
 
-    if ((processedCount + erroredCount) % 100 === 0)
+    if ((processedCount + erroredCount) % logBatchSize === 0)
       console.log(`processed ${processedCount} docs. (${erroredCount} errors)`);
   }
 

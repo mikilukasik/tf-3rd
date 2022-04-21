@@ -2,13 +2,14 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import { MongoClient } from 'mongodb';
 import { addTestDataSwitch } from './utils/addTestDataSwitch.mjs';
-import { addV1Output } from './utils/addV1Output.mjs';
+import { addV2Output } from './utils/addV2Output.mjs';
+import { addV2OutputBucket } from './utils/addV2OutputBucket.mjs';
 import { addWNextFen } from './utils/addWNextFen.mjs';
 import pkg1 from '../utils/stockfish_worker.js';
 const { getStockfishSearchScore, getMovedFen } = pkg1;
 
 const BATCH_SIZE = 100;
-const parentFolder = 'data/html/5';
+const parentFolder = 'data/html/0x';
 
 const client = new MongoClient('mongodb://0.0.0.0:27017');
 let db;
@@ -288,8 +289,9 @@ const getRecords = async ({ fens, origResult, fileName }) => {
   const newRecords = records.map((record) => {
     const recordWithTestSwitch = addTestDataSwitch({ record });
     const recordWithWNextFen = addWNextFen({ record: recordWithTestSwitch, doc: { result } });
-    const recordWithWV1Output = addV1Output({ record: recordWithWNextFen });
-    return recordWithWV1Output;
+    const recordWithV2Output = addV2Output({ record: recordWithWNextFen });
+    const recordWithV2OutputBucket = addV2OutputBucket({ record: recordWithV2Output });
+    return recordWithV2OutputBucket;
   });
 
   return { records: newRecords, result, fensAdded };
