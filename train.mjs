@@ -6,8 +6,8 @@ import { getDatasetFromDisc } from './src/scripts/utils/getDatasetFromDisc.mjs';
 // import { getDataset } from './src/scripts/utils/getDataset.mjs';
 import { fen2flatArray } from './transform.js';
 
-const sourceModelDirName = 'models/kernel8V1Smaller';
-const modelDirName = 'models/kernel8V1Smaller_2';
+const sourceModelDirName = 'models/3sizesV1Smaller_4_trainable';
+const modelDirName = 'models/3sizesV1Smaller_5';
 
 const recordsPerDataset = 200000;
 const testRecordsPerDataset = 20000;
@@ -22,12 +22,12 @@ const patience = 1;
 const startTime = Date.now();
 const needsWNext = true;
 const needsPieceVals = true;
-const learningRate = 0.00003;
+const learningRate = 0.00001;
 
-let sourceCode;
+let createModelCode;
+let trainCode;
 let transformCode;
 let trainingMeta = {};
-let trainDatasetFiles;
 let testData;
 
 const constants = {
@@ -90,6 +90,7 @@ const loadTestData = (() => {
 })();
 
 const loadModel = async ({ folder }) => {
+  createModelCode = await fs.readFile(path.resolve(sourceModelDirName, 'createModel.js'));
   const model = await tf.loadLayersModel(`file://${folder}/model.json`);
   model.compile({
     optimizer: tf.train.adam(learningRate),
@@ -317,7 +318,8 @@ const saveModel = async ({ model, meanAbsoluteError, totalEpochs }) => {
 
   await model.save(`file://${modelFolder}`);
   // await fs.writeFile(path.resolve(modelFolder, 'info.json'), JSON.stringify(info, null, 2), 'utf8');
-  await fs.writeFile(path.resolve(modelFolder, 'source.js'), sourceCode, 'utf8');
+  await fs.writeFile(path.resolve(modelFolder, 'createModel.js'), createModelCode, 'utf8');
+  await fs.writeFile(path.resolve(modelFolder, 'train.js'), trainCode, 'utf8');
   await fs.writeFile(path.resolve(modelFolder, 'transform.js'), transformCode, 'utf8');
   await fs.writeFile(path.resolve(modelFolder, 'constants.json'), JSON.stringify(constants, null, 2), 'utf8');
 };
@@ -413,21 +415,22 @@ const run = async function () {
 
 const init = async () => {
   try {
-    sourceCode = await fs.readFile('./retrain2.js', 'utf8');
+    trainCode = await fs.readFile('./train.mjs', 'utf8');
     transformCode = await fs.readFile('./transform.js', 'utf8');
+
+    const sourceModelFolder = path.resolve(sourceModelDirName);
+    const model = await loadModel({ folder: sourceModelFolder });
+    model.summary();
 
     const fullModelDirname = path.resolve(modelDirName);
     await fs.mkdir(fullModelDirname, { recursive: true });
-    await fs.writeFile(path.resolve(fullModelDirname, 'source.js'), sourceCode, 'utf8');
+    await fs.writeFile(path.resolve(fullModelDirname, 'createModel.js'), createModelCode, 'utf8');
+    await fs.writeFile(path.resolve(fullModelDirname, 'train.js'), trainCode, 'utf8');
     await fs.writeFile(path.resolve(fullModelDirname, 'transform.js'), transformCode, 'utf8');
     await fs.writeFile(path.resolve(fullModelDirname, 'constants.json'), JSON.stringify(constants, null, 2), 'utf8');
     await loadTrainingMeta();
 
     await loadTestData();
-
-    const sourceModelFolder = path.resolve(sourceModelDirName);
-    const model = await loadModel({ folder: sourceModelFolder });
-    model.summary();
 
     console.log('Starting initial evaluation...');
     const { meanAbsoluteError } = await evaluateModel({ model, testData });

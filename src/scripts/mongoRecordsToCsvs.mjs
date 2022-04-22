@@ -18,7 +18,7 @@ const run = async (testData = false) => {
     });
 
     do {
-      if (counter > (testData ? 50000 : 1000000)) break;
+      if (counter > (testData ? 150000 : 1500000)) break;
 
       const folder = path.resolve(
         OUTPUT_FOLDER,
