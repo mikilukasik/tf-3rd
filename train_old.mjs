@@ -1,18 +1,18 @@
 import tf from '@tensorflow/tfjs-node';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { datasetReader } from './src/scripts/utils/getDatasetFromDisc.mjs';
+import { getDatasetFromDisc } from './src/scripts/utils/getDatasetFromDisc.mjs';
+// import { fen2flatArray } from './transform';
+// import { getDataset } from './src/scripts/utils/getDataset.mjs';
 import { fen2flatArray } from './transform.js';
 
-const datasetFolder = './data/newCsvs2/all';
-
-const sourceModelDirName = 'models/3sizesMovesV1';
-const modelDirName = 'models/3sizesMovesV1_01';
+const sourceModelDirName = 'models/3sizesV1Tiny_02/0.09577-e1-1650719374052';
+const modelDirName = 'models/3sizesV1Tiny_04';
 
 const recordsPerDataset = 250000;
 const testRecordsPerDataset = 75000;
 
-const outUnits = 128;
+const outUnits = 1;
 const castlingIndex = 0;
 const enPassantIndex = 0;
 const inputLength = 12 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
@@ -51,20 +51,20 @@ const constants = {
 };
 
 const loadTestData = (() => {
-  // let pointers = {
-  //   // '-0.656 to -1': Math.random(),
-  //   // '0.641 to 0.984': Math.random(),
-  //   // '-0.359 to -0.641': Math.random(),
-  //   // '0.344 to 0.625': Math.random(),
-  //   // '-0.203 to -0.344': Math.random(),
-  //   // '0.188 to 0.328': Math.random(),
-  //   // '-0.141 to -0.188': Math.random(),
-  //   // '0.125 to 0.172': Math.random(),
-  //   // '-0.078 to -0.125': Math.random(),
-  //   // '0.063 to 0.109': Math.random(),
-  //   // '-0.016 to -0.063': Math.random(),
-  //   // '0 to 0.047': Math.random(),
-  // };
+  let pointers = {
+    // '-0.656 to -1': Math.random(),
+    // '0.641 to 0.984': Math.random(),
+    // '-0.359 to -0.641': Math.random(),
+    // '0.344 to 0.625': Math.random(),
+    // '-0.203 to -0.344': Math.random(),
+    // '0.188 to 0.328': Math.random(),
+    // '-0.141 to -0.188': Math.random(),
+    // '0.125 to 0.172': Math.random(),
+    // '-0.078 to -0.125': Math.random(),
+    // '0.063 to 0.109': Math.random(),
+    // '-0.016 to -0.063': Math.random(),
+    // '0 to 0.047': Math.random(),
+  };
 
   return async () => {
     // const testFileNames = (await fs.readdir(testDatasetDirName))
@@ -73,18 +73,12 @@ const loadTestData = (() => {
 
     // console.log(`Test files: ${testFileNames.join(', ')}`);
 
-    const { getNextBatch } = await datasetReader({
-      folder: path.resolve(datasetFolder, 'test-true'),
-      batchSize: testRecordsPerDataset,
+    const { result: rawTestData, newPointers } = await getDatasetFromDisc({
+      testData: true,
+      limit: testRecordsPerDataset,
+      pointers,
     });
-
-    const rawTestData = await getNextBatch();
-    // getDatasetFromDisc({
-    //   testData: true,
-    //   limit: testRecordsPerDataset,
-    //   pointers,
-    // });
-    // pointers = newPointers;
+    pointers = newPointers;
     // for (const fileName of testFileNames) {
     //   rawTestData.push(...JSON.parse(await fs.readFile(path.resolve(testDatasetDirName, fileName))));
     // }
@@ -155,32 +149,19 @@ const updateTrainingMeta = async (obj) => {
 // };
 
 const transformRecord = (record) => {
-  const [
+  const {
     fen, //: _fen, // : "2q5/6p1/p3q3/P7/k7/8/3K4/8 b - -",
-    ,
-    ,
-    ,
-    moveStr,
+    v2Output,
     // result, // : 0,
     // balancesAhead, // : [-19, -20, -20, -20, -20, -20, -20, -20, -20, -20, -20, -20, -20, -28, -28, -28],
-  ] = record;
+  } = record;
 
-  if (!moveStr) return null;
   // const { fen, mirrored } = getWhiteNextFen({ fen: _fen });
-
-  const [from, to] = moveStr.split('-').map(Number);
-
-  const expandedFrom = new Array(64).fill(0);
-  expandedFrom[from] = 1;
-
-  const expandedTo = new Array(64).fill(0);
-  expandedTo[to] = 1;
-
-  const ys = [...expandedFrom, ...expandedTo];
 
   const xs = fen2flatArray({ fenStr: fen, inputLength, castlingIndex, enPassantIndex });
 
   // const balanceScore = getBalanceScore({ result, balancesAhead, mirrored });
+  const ys = [v2Output];
 
   // if (ys[0] < -1 || ys[0] > 1) console.warn({ balancesAhead, result, ys });
 
@@ -199,7 +180,7 @@ const loadData = function (data) {
   };
 
   // load, normalize, transform, batch
-  return tf.data.array(data.filter(Boolean)).map(transform).batch(batchSize);
+  return tf.data.array(data).map(transform).batch(batchSize);
 };
 
 // train the model against the training data
@@ -275,7 +256,60 @@ const evaluateModel = async function ({ model, testData: rawTestData, tempFolder
   return result;
 };
 
-let getNextDatasets;
+const getNextDatasets = (() => {
+  let pointers = {
+    // '-0.656 to -1': Math.random(),
+    // '0.641 to 0.984': Math.random(),
+    // '-0.359 to -0.641': Math.random(),
+    // '0.344 to 0.625': Math.random(),
+    // '-0.203 to -0.344': Math.random(),
+    // '0.188 to 0.328': Math.random(),
+    // '-0.141 to -0.188': Math.random(),
+    // '0.125 to 0.172': Math.random(),
+    // '-0.078 to -0.125': Math.random(),
+    // '0.063 to 0.109': Math.random(),
+    // '-0.016 to -0.063': Math.random(),
+    // '0 to 0.047': Math.random(),
+  };
+
+  return async ({ iterationIndex } = {}) => {
+    // if (!trainDatasetFiles.length) return null;
+
+    console.log({ iterationIndex });
+    // const filesLoaded = [];
+    // let records = [];
+    const { result: records, newPointers } = await getDatasetFromDisc({
+      limit: recordsPerDataset,
+      pointers,
+      ponder: true,
+    });
+    pointers = newPointers;
+
+    console.log(`Loaded ${records.length} records.`);
+
+    // console.log(`Loading datasets:`); // from ${fullFileName}`);
+    // for (let nextFileIndex = 0; nextFileIndex < trainFilesPerDataset; nextFileIndex += 1) {
+    //   const fileName = trainDatasetFiles.pop();
+    //   if (!fileName) {
+    //     if (!records.length) return null;
+    //     break;
+    //   }
+
+    //   filesLoaded.push(fileName);
+
+    //   const fullFileName = path.resolve(trainDatasetDirName, fileName);
+
+    //   if (nextFileIndex > 0) process.stdout.write(', ');
+    //   process.stdout.write(fileName.split('-')[0]);
+
+    //   records = records.concat(JSON.parse(await fs.readFile(fullFileName, 'utf8')));
+    // }
+    // console.log(`\nLoaded ${records.length} train samples.`);
+    // records.sort(() => Math.random() - 0.5);
+
+    return { trainData: records };
+  };
+})();
 
 const saveModel = async ({ model, meanAbsoluteError, totalEpochs }) => {
   console.log('Saving model...');
@@ -381,52 +415,6 @@ const run = async function () {
 
 const init = async () => {
   try {
-    getNextDatasets = await (async () => {
-      const { getNextBatch } = await datasetReader({
-        folder: path.resolve(datasetFolder, 'test-false'),
-        batchSize: recordsPerDataset,
-      });
-
-      return async ({ iterationIndex } = {}) => {
-        // if (!trainDatasetFiles.length) return null;
-
-        console.log({ iterationIndex });
-        // const filesLoaded = [];
-        // let records = [];
-        const records = await getNextBatch();
-
-        // getDatasetFromDisc({
-        //   limit: recordsPerDataset,
-        //   pointers,
-        //   ponder: true,
-        // });
-        // // pointers = newPointers;
-
-        console.log(`Loaded ${records.length} records.`);
-
-        // console.log(`Loading datasets:`); // from ${fullFileName}`);
-        // for (let nextFileIndex = 0; nextFileIndex < trainFilesPerDataset; nextFileIndex += 1) {
-        //   const fileName = trainDatasetFiles.pop();
-        //   if (!fileName) {
-        //     if (!records.length) return null;
-        //     break;
-        //   }
-
-        //   filesLoaded.push(fileName);
-
-        //   const fullFileName = path.resolve(trainDatasetDirName, fileName);
-
-        //   if (nextFileIndex > 0) process.stdout.write(', ');
-        //   process.stdout.write(fileName.split('-')[0]);
-
-        //   records = records.concat(JSON.parse(await fs.readFile(fullFileName, 'utf8')));
-        // }
-        // console.log(`\nLoaded ${records.length} train samples.`);
-        // records.sort(() => Math.random() - 0.5);
-
-        return { trainData: records };
-      };
-    })();
     trainCode = await fs.readFile('./train.mjs', 'utf8');
     transformCode = await fs.readFile('./transform.js', 'utf8');
 
@@ -454,4 +442,4 @@ const init = async () => {
   }
 };
 
-run().catch(console.error);
+run();

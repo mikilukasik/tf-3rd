@@ -2,9 +2,9 @@ const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs').promises;
 const path = require('path');
 
-const modelDirName = 'models/3sizesV1Large';
+const modelDirName = 'models/3sizesMovesV1';
 
-const outUnits = 1;
+const outUnits = 128;
 const castlingIndex = 0;
 const enPassantIndex = 0;
 const inputLength = 12 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
@@ -43,23 +43,23 @@ const convBlock = ({ input, filters, kernelSize }) => {
 const buildModel = function () {
   const input = tf.input({ shape: [8, 8, inputLength] });
 
-  const conv1a = convBlock({ input, kernelSize: 8, filters: 32 });
-  const conv1b = convBlock({ input: conv1a, kernelSize: 8, filters: 128 });
+  const conv1a = convBlock({ input, kernelSize: 8, filters: 13 });
+  const conv1b = convBlock({ input: conv1a, kernelSize: 8, filters: 64 });
   const flat1 = tf.layers.flatten().apply(conv1b);
 
-  const conv2a = convBlock({ input, kernelSize: 5, filters: 24 });
-  const conv2b = convBlock({ input: conv2a, kernelSize: 5, filters: 96 });
+  const conv2a = convBlock({ input, kernelSize: 5, filters: 13 });
+  const conv2b = convBlock({ input: conv2a, kernelSize: 5, filters: 48 });
   const flat2 = tf.layers.flatten().apply(conv2b);
 
-  const conv3a = convBlock({ input, kernelSize: 3, filters: 16 });
-  const conv3b = convBlock({ input: conv3a, kernelSize: 3, filters: 48 });
+  const conv3a = convBlock({ input, kernelSize: 3, filters: 13 });
+  const conv3b = convBlock({ input: conv3a, kernelSize: 3, filters: 32 });
   const flat3 = tf.layers.flatten().apply(conv3b);
 
   const concatenated1 = tf.layers.concatenate().apply([flat1, flat2, flat3]);
   // const norm1 = tf.layers.batchNormalization().apply(concatenated1);
 
-  const dense1 = tf.layers.dense({ units: 1500, activation: tf.leakyReLU, useBias: false }).apply(concatenated1);
-  const dense2 = tf.layers.dense({ units: 750, activation: tf.leakyReLU, useBias: false }).apply(dense1);
+  const dense1 = tf.layers.dense({ units: 512, activation: tf.leakyReLU, useBias: false }).apply(concatenated1);
+  const dense2 = tf.layers.dense({ units: 256, activation: tf.leakyReLU, useBias: false }).apply(dense1);
 
   const output = tf.layers.dense({ units: outUnits, useBias: false }).apply(dense2);
 

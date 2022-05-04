@@ -27,7 +27,7 @@ export const getBucket = (num) => {
 };
 
 export const addV2OutputBucket = ({ record }) => {
-  if (typeof record.v2OutputBucket === 'string') return record;
+  // if (typeof record.v2OutputBucket === 'string') return record;
 
   return Object.assign({}, record, {
     v2OutputBucket: getBucket(record.v2Output),

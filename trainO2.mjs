@@ -6,13 +6,13 @@ import { fen2flatArray } from './transform.js';
 
 const datasetFolder = './data/newCsvs2/all';
 
-const sourceModelDirName = 'models/3sizesMovesV1';
-const modelDirName = 'models/3sizesMovesV1_01';
+const sourceModelDirName = 'models/3sizesV1Tiny_04/0.09403-e1-1650874231079';
+const modelDirName = 'models/3sizesV1Tiny_newDataSet_01';
 
 const recordsPerDataset = 250000;
 const testRecordsPerDataset = 75000;
 
-const outUnits = 128;
+const outUnits = 1;
 const castlingIndex = 0;
 const enPassantIndex = 0;
 const inputLength = 12 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
@@ -157,30 +157,17 @@ const updateTrainingMeta = async (obj) => {
 const transformRecord = (record) => {
   const [
     fen, //: _fen, // : "2q5/6p1/p3q3/P7/k7/8/3K4/8 b - -",
-    ,
-    ,
-    ,
-    moveStr,
+    v2Output,
     // result, // : 0,
     // balancesAhead, // : [-19, -20, -20, -20, -20, -20, -20, -20, -20, -20, -20, -20, -20, -28, -28, -28],
   ] = record;
 
-  if (!moveStr) return null;
   // const { fen, mirrored } = getWhiteNextFen({ fen: _fen });
-
-  const [from, to] = moveStr.split('-').map(Number);
-
-  const expandedFrom = new Array(64).fill(0);
-  expandedFrom[from] = 1;
-
-  const expandedTo = new Array(64).fill(0);
-  expandedTo[to] = 1;
-
-  const ys = [...expandedFrom, ...expandedTo];
 
   const xs = fen2flatArray({ fenStr: fen, inputLength, castlingIndex, enPassantIndex });
 
   // const balanceScore = getBalanceScore({ result, balancesAhead, mirrored });
+  const ys = [Number(v2Output)];
 
   // if (ys[0] < -1 || ys[0] > 1) console.warn({ balancesAhead, result, ys });
 
@@ -199,7 +186,7 @@ const loadData = function (data) {
   };
 
   // load, normalize, transform, batch
-  return tf.data.array(data.filter(Boolean)).map(transform).batch(batchSize);
+  return tf.data.array(data).map(transform).batch(batchSize);
 };
 
 // train the model against the training data

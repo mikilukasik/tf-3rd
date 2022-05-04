@@ -1,8 +1,15 @@
 import { getCollection } from './getCollection.mjs';
 
-export const updateMongoDocs = async ({ collectionName, filters, updater, closeClient, logBatchSize = 100 }) => {
+export const updateMongoDocs = async ({
+  collectionName,
+  filters,
+  updater,
+  closeClient,
+  logBatchSize = 100,
+  sort = {},
+}) => {
   const { collection, client } = await getCollection(collectionName);
-  const cursor = collection.find(filters);
+  const cursor = collection.find(filters).sort(sort);
 
   let processedCount = 0;
   let erroredCount = 0;
@@ -11,6 +18,7 @@ export const updateMongoDocs = async ({ collectionName, filters, updater, closeC
       await updater(doc, { collection });
       processedCount += 1;
     } catch (e) {
+      console.log(`Failed _id: ${doc._id}`);
       console.error(e);
       erroredCount += 1;
     }

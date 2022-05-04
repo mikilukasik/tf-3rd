@@ -12,7 +12,7 @@ export const bulkWriter = ({ collectionName, batchSize = 50 }) => {
   };
 
   const addOp = async (op) => {
-    cache.push(op);
+    cache.push(...[].concat(op));
     if (cache.length >= batchSize) await writeCache();
   };
 
