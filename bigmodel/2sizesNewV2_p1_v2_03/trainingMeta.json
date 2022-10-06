@@ -1,0 +1,23 @@
+{
+  "modelDirName": "models/2sizesNewV2_p1_v2_03",
+  "outUnits": 134,
+  "castlingIndex": 0,
+  "enPassantIndex": 0,
+  "inputLength": 38,
+  "batchSize": 750,
+  "maxEpochs": 250,
+  "patience": 1,
+  "startTime": 1653740389359,
+  "recordsPerDataset": 30000,
+  "testRecordsPerDataset": 10000,
+  "needsWNext": true,
+  "needsPieceVals": true,
+  "learningRate": 0.00001,
+  "sourceModelDirName": "models/2sizesNewV2_p1_v2_02/0.03592-e1-1653677000984",
+  "movesModel": true,
+  "iterations": [],
+  "filesLearned": [],
+  "samplesLearned": 0,
+  "completedIterations": 0,
+  "completedEpochs": 0
+}

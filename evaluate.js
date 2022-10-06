@@ -141,7 +141,7 @@ const mirrorOnX = (record) => {
   return Object.assign({}, record, { fen: [newBoard, ...restOfFen].join(' ') });
 };
 
-const expandGroupedBlanks = (rowStr) => {
+export const expandGroupedBlanks = (rowStr) => {
   let result = rowStr;
   for (const char of rowStr) if (Number(char)) result = result.replace(char, '1'.repeat(Number(char)));
   return result;

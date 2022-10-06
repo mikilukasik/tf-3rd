@@ -1,28 +1,29 @@
 import tf from '@tensorflow/tfjs-node';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { datasetReader } from './src/scripts/utils/getDatasetFromDisc.mjs';
-import { fen2flatArray } from './transform.js';
+import { datasetReader } from './src/scripts/utils/getMovesDatasetFromDisc.mjs';
+import { getXs } from './transform.js';
 
-const datasetFolder = './data/newCsvs2/all';
+const datasetFolder = './data/newCsvs3';
 
-const sourceModelDirName = 'models/3sizesMovesV1';
-const modelDirName = 'models/3sizesMovesV1_01';
+const sourceModelDirName = 'models/2sizesNewV2_p2_v5/0.03510-e1-1653999688904';
+const modelDirName = 'models/2sizesNewV2_p2_v6';
 
-const recordsPerDataset = 250000;
-const testRecordsPerDataset = 75000;
+const recordsPerDataset = 30000;
+const testRecordsPerDataset = 10000;
 
-const outUnits = 128;
+const outUnits = 134;
 const castlingIndex = 0;
 const enPassantIndex = 0;
-const inputLength = 12 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
-const batchSize = 1000;
+const inputLength = 12 * 3 + 2; //12 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
+// ; //12 * 5 + 2; //12 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
+const batchSize = 750;
 const maxEpochs = 250;
 const patience = 1;
 const startTime = Date.now();
 const needsWNext = true;
 const needsPieceVals = true;
-const learningRate = 0.00003;
+const learningRate = 0.000001;
 
 let createModelCode;
 let trainCode;
@@ -48,6 +49,7 @@ const constants = {
   needsPieceVals,
   learningRate,
   sourceModelDirName,
+  movesModel: true,
 };
 
 const loadTestData = (() => {
@@ -74,11 +76,15 @@ const loadTestData = (() => {
     // console.log(`Test files: ${testFileNames.join(', ')}`);
 
     const { getNextBatch } = await datasetReader({
-      folder: path.resolve(datasetFolder, 'test-true'),
+      folder: path.resolve(datasetFolder), //, 'test-true'),
+      test: true,
       batchSize: testRecordsPerDataset,
+      progressGroups: [2],
     });
+    console.log('datasetReader for test samples initialized, getting test samples...');
 
     const rawTestData = await getNextBatch();
+    console.log(`got ${rawTestData.length} test samples`);
     // getDatasetFromDisc({
     //   testData: true,
     //   limit: testRecordsPerDataset,
@@ -90,6 +96,12 @@ const loadTestData = (() => {
     // }
 
     console.log(`Loaded ${rawTestData.length} test samples.`);
+
+    // console.log(
+    //   transformRecord(rawTestData[0])
+    //     .map((x) => typeof x)
+    //     .find((x) => x !== 'number'),
+    // );
 
     testData = loadData(rawTestData.map(transformRecord).filter(Boolean));
   };
@@ -155,30 +167,45 @@ const updateTrainingMeta = async (obj) => {
 // };
 
 const transformRecord = (record) => {
+  // [wf, p, ...p4f, lmf, lmt, ...wm, pm]
+  // console.log(record);
   const [
     fen, //: _fen, // : "2q5/6p1/p3q3/P7/k7/8/3K4/8 b - -",
     ,
-    ,
-    ,
-    moveStr,
+    prevFen1,
+    prevFen2,
+    prevFen3,
+    prevFen4,
+    lmf,
+    lmt,
+    m0,
+    m1,
+    pm,
+    // ,
+    // ,
+    // ,
+    // moveStr,
     // result, // : 0,
     // balancesAhead, // : [-19, -20, -20, -20, -20, -20, -20, -20, -20, -20, -20, -20, -20, -28, -28, -28],
   ] = record;
 
-  if (!moveStr) return null;
+  // if (!moveStr) return null;
   // const { fen, mirrored } = getWhiteNextFen({ fen: _fen });
 
-  const [from, to] = moveStr.split('-').map(Number);
+  // const [from, to] = moveStr.split('-').map(Number);
 
   const expandedFrom = new Array(64).fill(0);
-  expandedFrom[from] = 1;
+  expandedFrom[Number(m0)] = 1;
 
   const expandedTo = new Array(64).fill(0);
-  expandedTo[to] = 1;
+  expandedTo[Number(m1)] = 1;
 
-  const ys = [...expandedFrom, ...expandedTo];
+  const expandedPiece = new Array(6).fill(0);
+  expandedPiece[['P', 'B', 'N', 'R', 'Q', 'K'].findIndex((e) => e === pm)] = 1;
 
-  const xs = fen2flatArray({ fenStr: fen, inputLength, castlingIndex, enPassantIndex });
+  const ys = [expandedFrom, expandedTo, expandedPiece].flat();
+
+  const xs = getXs({ fens: [prevFen1, prevFen3, fen], lmf, lmt });
 
   // const balanceScore = getBalanceScore({ result, balancesAhead, mirrored });
 
@@ -353,6 +380,8 @@ const runIteration = async ({ model, iterationIndex }) => {
 };
 
 // run
+let currentBest = 999;
+
 const run = async function () {
   const { model } = await init();
 
@@ -367,7 +396,13 @@ const run = async function () {
       const { meanAbsoluteError } = await evaluateModel({ model, testData });
       console.log(`meanAbsoluteError: ${meanAbsoluteError}`);
 
-      if (Math.random() > 0.66) await saveModel({ model, meanAbsoluteError, totalEpochs: epochIndex });
+      if (meanAbsoluteError <= currentBest) {
+        currentBest = meanAbsoluteError;
+        await saveModel({ model, meanAbsoluteError, totalEpochs: epochIndex });
+        continue;
+      }
+
+      if (Math.random() > 0.9) await saveModel({ model, meanAbsoluteError, totalEpochs: epochIndex });
     } while (!finished);
 
     // console.log('Iteration done, evaluating...');
@@ -383,10 +418,12 @@ const init = async () => {
   try {
     getNextDatasets = await (async () => {
       const { getNextBatch } = await datasetReader({
-        folder: path.resolve(datasetFolder, 'test-false'),
+        folder: path.resolve(datasetFolder), //, 'test-false'),
+        test: false,
         batchSize: recordsPerDataset,
+        progressGroups: [2],
       });
-
+      console.log('datasetReader for lessons initialized');
       return async ({ iterationIndex } = {}) => {
         // if (!trainDatasetFiles.length) return null;
 

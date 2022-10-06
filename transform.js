@@ -47,7 +47,80 @@ const getWhiteNextFen = ({ fen }) => {
   return { fen: `${invertedBoard} w ${invertedCastling} ${mirroredEnPassant}`, mirrored: true };
 };
 
-const fen2flatArray = ({ fenStr, inputLength: _inputLength, castlingIndex = 12, enPassantIndex = 0 }) => {
+const getLmVal = (allValsString, index) =>
+  1 / (Number(`0x${allValsString[index * 2]}${allValsString[index * 2 + 1]}`) || 0.5);
+
+const getXs = ({ fens, lmt, lmf }) => {
+  const expandedFens = fens.map((fen) => {
+    if (!fen) return Array(64).fill(Array(12).fill(0));
+
+    const [board] = fen.split(' ');
+    const arr = [];
+    board.split('').forEach((char) => {
+      switch (char) {
+        case 'p':
+          arr.push([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+          break;
+        case 'b':
+          arr.push([0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+          break;
+        case 'n':
+          arr.push([0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+          break;
+        case 'r':
+          arr.push([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]);
+          break;
+        case 'q':
+          arr.push([0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]);
+          break;
+        case 'k':
+          arr.push([0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0]);
+          break;
+
+        case 'P':
+          arr.push([0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0]);
+          break;
+        case 'B':
+          arr.push([0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]);
+          break;
+        case 'N':
+          arr.push([0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]);
+          break;
+        case 'R':
+          arr.push([0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]);
+          break;
+        case 'Q':
+          arr.push([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]);
+          break;
+        case 'K':
+          arr.push([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
+          break;
+
+        case '/':
+          break;
+
+        default:
+          for (let emptyIndex = 0; emptyIndex < Number(char); emptyIndex += 1) arr.push(Array(12).fill(0));
+      }
+    });
+    return arr;
+  });
+
+  // if (!lmt || !lmf) {
+  //   console.log({ lmt, lmf, fens });
+  // }
+
+  return new Array(64)
+    .fill(0)
+    .map((dummy, index) => [
+      ...expandedFens.map((expandedFen) => expandedFen[index]).flat(),
+      getLmVal(lmf, index),
+      getLmVal(lmt, index),
+    ])
+    .flat();
+};
+
+const fen2flatArray = ({ fenStr, inputLength: _inputLength, castlingIndex = 0, enPassantIndex = 0 }) => {
   const inputLength = _inputLength || 12 + (castlingIndex ? 1 : 0) + (enPassantIndex ? 1 : 0);
 
   const [board, nextChar, castling, enPassant] = fenStr.split(' ');
@@ -109,4 +182,5 @@ const fen2flatArray = ({ fenStr, inputLength: _inputLength, castlingIndex = 12, 
 module.exports = {
   fen2flatArray,
   getWhiteNextFen,
+  getXs,
 };

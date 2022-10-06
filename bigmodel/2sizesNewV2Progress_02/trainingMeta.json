@@ -1,0 +1,23 @@
+{
+  "modelDirName": "models/2sizesNewV2Progress_02",
+  "outUnits": 1,
+  "castlingIndex": 0,
+  "enPassantIndex": 0,
+  "inputLength": 38,
+  "batchSize": 750,
+  "maxEpochs": 250,
+  "patience": 1,
+  "startTime": 1653929767254,
+  "recordsPerDataset": 30000,
+  "testRecordsPerDataset": 10000,
+  "needsWNext": true,
+  "needsPieceVals": true,
+  "learningRate": 0.00003,
+  "sourceModelDirName": "models/2sizesNewV2Progress_01/0.05199-e1-1653920624887",
+  "movesModel": true,
+  "iterations": [],
+  "filesLearned": [],
+  "samplesLearned": 0,
+  "completedIterations": 0,
+  "completedEpochs": 0
+}

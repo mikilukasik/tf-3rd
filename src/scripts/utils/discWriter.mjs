@@ -2,10 +2,12 @@ import * as path from 'path';
 import { promises as fs } from 'fs';
 
 const RECORDS_PER_FILE = 2500;
+const FILES_PER_FOLDER = 100;
 
-export const discWriter = ({ groups, recordsFolder, gamesFolder }) => {
+export const discWriter = ({ groups, recordsFolder, gamesFolder = 'default' }) => {
   const cache = {};
   const counters = {};
+  const activeSubFolders = {};
 
   setInterval(() => {
     console.log('Writing cache to disc');
@@ -16,7 +18,7 @@ export const discWriter = ({ groups, recordsFolder, gamesFolder }) => {
     for (const folder of Object.keys(cache)) {
       if (cache[folder].length === 0) continue;
 
-      const subFolder = path.resolve(folder, Math.floor(Math.random() * 25).toString());
+      const subFolder = path.resolve(folder, activeSubFolders[folder].toString());
 
       const fragmentRatio = cache[folder].length / RECORDS_PER_FILE;
       if (counters[subFolder] && Math.random() >= fragmentRatio) {
@@ -28,35 +30,55 @@ export const discWriter = ({ groups, recordsFolder, gamesFolder }) => {
         await fs.mkdir(subFolder, { recursive: true });
       }
 
-      await fs.appendFile(path.resolve(subFolder, `${counters[subFolder]}.csv`), cache[folder].join('\n'), 'utf8');
+      await fs.appendFile(
+        path.resolve(subFolder, `${counters[subFolder]}.csv`),
+        `${cache[folder].join('\n')}\n`,
+        'utf8',
+      );
       cache[folder].length = 0;
       counters[subFolder] += 1;
+
+      if (counters[subFolder] > FILES_PER_FOLDER) {
+        activeSubFolders[folder] += 1;
+        delete counters[subFolder];
+      }
     }
   };
 
   const writeRecordToDisc = async (records) => {
     for (const record of [].concat(records)) {
-      for (const { groupName, filter, getPath, transform } of groups) {
+      for (const { groupName, filter, getPath, transform } of Array.isArray(groups) ? groups : groups(record)) {
         if (!filter(record)) continue;
 
         const folder = path.resolve(recordsFolder, groupName, `test-${record.t}`, getPath(record));
 
         if (!cache[folder]) {
           cache[folder] = [];
+          activeSubFolders[folder] = 0;
         }
 
         cache[folder].push(transform(record));
 
         if (cache[folder].length >= RECORDS_PER_FILE) {
-          const subFolder = path.resolve(folder, Math.floor(Math.random() * 25).toString());
+          const subFolder = path.resolve(folder, activeSubFolders[folder].toString());
+
           if (!counters[subFolder]) {
             counters[subFolder] = 0;
             await fs.mkdir(subFolder, { recursive: true });
           }
 
-          await fs.writeFile(path.resolve(subFolder, `${counters[subFolder]}.csv`), cache[folder].join('\n'), 'utf8');
+          await fs.writeFile(
+            path.resolve(subFolder, `${counters[subFolder]}.csv`),
+            `${cache[folder].join('\n')}\n`,
+            'utf8',
+          );
           cache[folder].length = 0;
           counters[subFolder] += 1;
+
+          if (counters[subFolder] > FILES_PER_FOLDER) {
+            activeSubFolders[folder] += 1;
+            delete counters[subFolder];
+          }
         }
       }
     }
