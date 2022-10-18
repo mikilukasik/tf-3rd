@@ -2,7 +2,7 @@ const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs').promises;
 const path = require('path');
 
-const modelDirName = 'models/inc2';
+const modelDirName = 'models/inc_fixed_1';
 const outUnits = 1792;
 const inputLength = 12 + 2; //pieces + cellHistory (lmf & lmt)
 
@@ -32,35 +32,32 @@ const conv = ({ filters, kernelSize, layerNamePrefix }) =>
     padding: 'same',
     // activation,
     useBias: false,
-    name: `${layerNamePrefix}__conv2d-${Math.random().toString().slice(2)}`,
+    name: `${layerNamePrefix}__conv2d_k${kernelSize}f${filters}-${Math.random().toString().slice(2)}`,
   });
 
 const convBlock = ({ input, filters, kernelSize, layerNamePrefix }) => {
   const conv1 = conv({ filters, kernelSize, layerNamePrefix }).apply(input);
   const activated = tf.layers
-    .reLU({ name: `${layerNamePrefix}__reLU-${Math.random().toString().slice(2)}` })
+    .leakyReLU({ name: `${layerNamePrefix}__leakyReLU-${Math.random().toString().slice(2)}` })
     .apply(conv1);
   return activated;
 };
 const buildModel = function ({ layerNamePrefix }) {
   const input = tf.input({ shape: [8, 8, inputLength], name: `${layerNamePrefix}__input` });
 
-  const conv3a = convBlock({ input, kernelSize: 3, filters: 32, layerNamePrefix });
-  const conv3b = convBlock({ input: conv3a, kernelSize: 3, filters: 64, layerNamePrefix });
-  const conv3c = convBlock({ input: conv3b, kernelSize: 3, filters: 128, layerNamePrefix });
-  const conv3d = convBlock({ input: conv3c, kernelSize: 3, filters: 256, layerNamePrefix });
+  const conv3a = convBlock({ input, kernelSize: 2, filters: 13, layerNamePrefix });
   // const flat3a = tf.layers
   //   .flatten({
   //     name: `${layerNamePrefix}__flatten-${Math.random().toString().slice(2)}`,
   //   })
   //   .apply(conv3a);
 
-  // const conv3b = convBlock({ input: conv3a, kernelSize: 3, filters: 64, layerNamePrefix });
+  const conv3b = convBlock({ input: conv3a, kernelSize: 2, filters: 26, layerNamePrefix });
   const flat3b = tf.layers
     .flatten({
       name: `${layerNamePrefix}__flatten-${Math.random().toString().slice(2)}`,
     })
-    .apply(conv3d);
+    .apply(conv3b);
 
   // const conv3c = convBlock({ input: conv3b, kernelSize: 4, filters: 64, layerNamePrefix });
   // const flat3c = tf.layers
@@ -75,18 +72,18 @@ const buildModel = function ({ layerNamePrefix }) {
 
   const dense1 = tf.layers
     .dense({
-      units: outUnits * 2,
-      activation: tf.reLU,
+      units: Math.ceil(outUnits / 2),
+      activation: tf.leakyReLU,
       useBias: false,
-      name: `${layerNamePrefix}__dense-${Math.random().toString().slice(2)}`,
+      name: `${layerNamePrefix}__dense_leakyReLU_u${Math.ceil(outUnits / 2)}-${Math.random().toString().slice(2)}`,
     })
     .apply(flat3b);
   const dense2 = tf.layers
     .dense({
-      units: outUnits * 2,
-      activation: tf.reLU,
+      units: outUnits,
+      activation: tf.leakyReLU,
       useBias: false,
-      name: `${layerNamePrefix}__dense-${Math.random().toString().slice(2)}`,
+      name: `${layerNamePrefix}__dense_leakyReLU_u${outUnits}-${Math.random().toString().slice(2)}`,
     })
     .apply(dense1);
 
@@ -95,7 +92,7 @@ const buildModel = function ({ layerNamePrefix }) {
       units: outUnits,
       useBias: false,
       activation: 'softmax',
-      name: `${layerNamePrefix}__dense-${Math.random().toString().slice(2)}`,
+      name: `${layerNamePrefix}__softmax_output-${Math.random().toString().slice(2)}`,
     })
     .apply(dense2);
 
@@ -114,7 +111,7 @@ const saveModel = async ({ model, folder, info }) => {
 const run = async function () {
   const { folder } = await init();
 
-  const model = buildModel({ layerNamePrefix: modelDirName });
+  const model = buildModel({ layerNamePrefix: 'v1' });
   model.summary();
 
   await saveModel({ model, folder: folder });

@@ -4,6 +4,7 @@ import { promises as fs } from 'fs';
 import { getRandomFileFromDir } from './getRandomFileFromDir.mjs';
 import { getGroups } from './groups.mjs';
 import getFolderSize from 'get-folder-size';
+import { shuffle } from '../../../chss-module-engine/src/utils/schuffle.js';
 
 // const GROUP_SIZE_CUTOFF = 30000000;
 
@@ -36,9 +37,15 @@ const getNextFileName = async (fileName) => {
   }
 
   // read all in category, start from beginning
+  console.log(`finished reading dataset at file ${fileName}`);
+
   const firstFolder = split.slice(0, -2).concat(parentDirContents[0]).join('/');
   const firstFolderContents = (await fs.readdir(firstFolder)).sort();
-  return path.resolve(firstFolder, firstFolderContents[0]);
+
+  const newFileName = path.resolve(firstFolder, firstFolderContents[0]);
+  console.log(`starting dataset from beginning at file ${newFileName}`);
+
+  return newFileName;
 };
 
 const getSampleCounts = async ({ folder, progressGroups, groups, test, batchSize }) => {
@@ -143,24 +150,47 @@ const readMore = async ({ takeMax, pointers, pointerKey }) => {
   return parsedData;
 };
 
-const readFromGroup = async ({ pointers, pointerKey, take, folder }) => {
+const readFromGroup = async ({ pointers, pointerKey, take, folder, filter = () => true, noDupes }) => {
   const result = [];
   if (!take) return result;
 
   if (!pointers[pointerKey]) {
     // we only get here on 1st run if inited without pointers
+    const fileName = await getRandomFileFromDir(path.resolve(folder, pointerKey));
+
+    console.log(`starting to read dataset from file ${fileName}`);
+
     pointers[pointerKey] = {
-      fileName: await getRandomFileFromDir(path.resolve(folder, pointerKey)),
+      fileName,
       index: 0,
     };
   }
 
+  const fensSeen = {};
+  let removedDupes = 0;
+
   let remaining = take;
   while (remaining) {
-    const records = await readMore({ takeMax: remaining, pointers, pointerKey });
+    const records = (await readMore({ takeMax: remaining, pointers, pointerKey })).filter(
+      // TODO: make this more random. we should choose any one of the dupes, not always the 1st one
+      noDupes
+        ? (line) => {
+            if (fensSeen[`${line[1]}${line[7]}`]) {
+              removedDupes += 1;
+              return false;
+            }
+            if (!filter(line)) return false;
+
+            fensSeen[`${line[1]}${line[7]}`] = true;
+            return true;
+          }
+        : filter,
+    );
     remaining -= records.length;
     result.push(...records);
   }
+
+  if (removedDupes) console.log(`Filtered out ${removedDupes} duplicate fens`);
 
   return result;
 };
@@ -181,29 +211,45 @@ export const datasetReader = async ({
   const getNextBatch = async () => {
     const result = [];
     for (const groupName of Object.keys(sampleCounts)) {
-      // console.log({ groupName, c: sampleCounts[groupName] });
-      // const progressGroup = progressGroupAnyType.toString();
-
-      // for (const { groupName, take } of groups) {
-      // const adjustedTake = Math.round(take * multipliers[groupName][progressGroup]);
-      // const pointerKey = `${progressGroup}/${groupName}`;
-
       const groupResults = await readFromGroup({
         pointers,
         pointerKey: groupName,
         take: sampleCounts[groupName],
         folder,
-        // groupName,
       });
 
       result.push(...groupResults);
-      // }
     }
 
-    result.sort(() => Math.random() - 0.5);
+    shuffle(result);
 
     return result;
   };
+
+  return {
+    getNextBatch,
+  };
+};
+
+export const datasetReaderV2 = async ({
+  folder,
+  batchSize = 5000,
+  pointers: _pointers = {},
+  filter,
+  test = false,
+  noDupes = false,
+}) => {
+  const pointers = Object.assign({}, _pointers);
+
+  const getNextBatch = () =>
+    readFromGroup({
+      pointers,
+      pointerKey: test ? 'test-true' : 'test-false',
+      take: batchSize,
+      folder,
+      filter,
+      noDupes,
+    });
 
   return {
     getNextBatch,

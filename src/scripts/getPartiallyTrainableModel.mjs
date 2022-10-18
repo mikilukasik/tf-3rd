@@ -3,13 +3,22 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 
 const sourceModelDirName = 'models/oneHot_rs_v1_0.000001/2.42042780-1665402178396';
-const targetModelDirName = 'models/oneHot_v1t';
+const targetModelDirName = 'models/oneHot_v1pt';
 
 const filesToCopy = ['trainIncModel.mjs', 'transform.js'];
+const trainableLayers = [
+  'p0__dense-1414710678503921',
+  'p1__dense-17392091549313649',
+  'p2__dense-22180078889882937',
+  'dense_Dense1',
+  'p0__dense-8422601493741717',
+  'p1__dense-8918054394688957',
+  'p2__dense-25141983600994555',
+];
 
 const getTweakedModel = ({ sourceModel }) => {
   for (const layer of sourceModel.layers) {
-    layer.trainable = true;
+    layer.trainable = trainableLayers.includes(layer.name);
   }
 
   return sourceModel;

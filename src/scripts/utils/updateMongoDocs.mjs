@@ -5,11 +5,14 @@ export const updateMongoDocs = async ({
   filters,
   updater,
   closeClient,
-  logBatchSize = 100,
+  logBatchSize = 1000,
   sort = {},
+  project = {},
+  skip = 0,
+  lastSortValUpdater = (e) => e,
 }) => {
   const { collection, client } = await getCollection(collectionName);
-  const cursor = collection.find(filters).sort(sort);
+  const cursor = collection.find(filters).project(project).sort(sort).skip(skip);
 
   let processedCount = 0;
   let erroredCount = 0;
@@ -23,8 +26,10 @@ export const updateMongoDocs = async ({
       erroredCount += 1;
     }
 
-    if ((processedCount + erroredCount) % logBatchSize === 0)
+    if ((processedCount + erroredCount) % logBatchSize === 0) {
       console.log(`processed ${processedCount} docs. (${erroredCount} errors)`);
+      lastSortValUpdater(doc.s);
+    }
   }
 
   if (closeClient) client.close();

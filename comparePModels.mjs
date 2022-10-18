@@ -6,12 +6,14 @@ import { getXs } from './transform.js';
 const datasetFolder = './data/newCsvs3';
 
 const sourceModelDirNames = {
-  p0: 'models/2sizesNewV2_p0_v2_04/0.03839-e1-1653577774895',
-  p1: 'models/2sizesNewV2_p1_v2_03/0.03550-e1-1653741265601',
-  p2: 'models/2sizesNewV2_p2_v6/0.03507-e1-1654062244911',
+  p0: 'models/2sizesNewV2_p0_v2_04/0.03839-e1-1653577774895__p0',
+  p1: 'models/2sizesNewV2_p1_v2_03/0.03550-e1-1653741265601__p1',
+  p2: 'models/2sizesNewV2_p2_v6/0.03507-e1-1654062244911__p2',
+  p3: 'models/2sizesMerged_v2__big_6/0.03694-e1-1665086482565',
+  p4: 'models/2sizesMerged_v3_5/0.03642-e1-1665154724250',
 };
 
-const testRecordsPerDataset = 60000;
+const testRecordsPerDataset = 10000;
 
 const inputLength = 12 * 3 + 2;
 const batchSize = 750;
@@ -155,12 +157,14 @@ const init = async () => {
       await loadModel({ folder: path.resolve(sourceModelDirNames.p0) }),
       await loadModel({ folder: path.resolve(sourceModelDirNames.p1) }),
       await loadModel({ folder: path.resolve(sourceModelDirNames.p2) }),
+      await loadModel({ folder: path.resolve(sourceModelDirNames.p3) }),
+      await loadModel({ folder: path.resolve(sourceModelDirNames.p4) }),
     ];
 
     for (const dataProgress of [0, 1, 2]) {
       const testData = await loadTestData({ progress: dataProgress });
 
-      for (const modelProgress of [0, 1, 2]) {
+      for (const modelProgress of [0, 1, 2, 3, 4]) {
         const { meanAbsoluteError } = await evaluateModel({ model: models[modelProgress], testData });
         console.log(`p${dataProgress} data on p${modelProgress} model meanAbsoluteError: ${meanAbsoluteError}`);
       }

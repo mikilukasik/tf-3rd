@@ -2,14 +2,22 @@ import * as tf from '@tensorflow/tfjs-node';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 
-const sourceModelDirName = 'models/oneHot_rs_v1_0.000001/2.42042780-1665402178396';
-const targetModelDirName = 'models/oneHot_v1t';
+const sourceModelDirName = 'models/2sizesMerged_v3';
+const targetModelDirName = 'models/2sizesMerged_clean_v5';
 
-const filesToCopy = ['trainIncModel.mjs', 'transform.js'];
+const filesToCopy = ['train.js', 'transform.js'];
 
 const getTweakedModel = ({ sourceModel }) => {
   for (const layer of sourceModel.layers) {
     layer.trainable = true;
+
+    const weights = layer.getWeights();
+    if (!weights || !weights.length) continue;
+    // console.log(weights);
+    // layer.setWeights(weights.map((w) => tf.rand(w.shape, Math.random)));
+    layer.setWeights(weights.map((w) => tf.zerosLike(w)));
+
+    // layer.setWeights(tf.zeros());
   }
 
   return sourceModel;

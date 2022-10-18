@@ -1,7 +1,7 @@
 import * as path from 'path';
 import { promises as fs } from 'fs';
 
-const RECORDS_PER_FILE = 2500;
+const RECORDS_PER_FILE = 5000;
 const FILES_PER_FOLDER = 100;
 
 export const discWriter = ({ groups, recordsFolder, gamesFolder = 'default' }) => {
@@ -48,7 +48,7 @@ export const discWriter = ({ groups, recordsFolder, gamesFolder = 'default' }) =
   const writeRecordToDisc = async (records) => {
     for (const record of [].concat(records)) {
       for (const { groupName, filter, getPath, transform } of Array.isArray(groups) ? groups : groups(record)) {
-        if (!filter(record)) continue;
+        if (filter && !filter(record)) continue;
 
         const folder = path.resolve(recordsFolder, groupName, `test-${record.t}`, getPath(record));
 
@@ -96,9 +96,15 @@ export const discWriter = ({ groups, recordsFolder, gamesFolder = 'default' }) =
     await fs.writeFile(path.resolve(folder, `${game._id}.json`), JSON.stringify(game), 'utf8');
   };
 
+  const updateStatsFile = async (statsData) => {
+    await fs.mkdir(recordsFolder, { recursive: true });
+    fs.writeFile(path.resolve(recordsFolder, 'stats'), statsData.toString(), 'utf8');
+  };
+
   return {
     writeRecordToDisc,
     writeGameToDisc,
     writeCache,
+    updateStatsFile,
   };
 };
