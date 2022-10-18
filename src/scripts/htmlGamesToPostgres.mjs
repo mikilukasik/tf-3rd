@@ -1,16 +1,12 @@
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { MongoClient } from 'mongodb';
-// import { addTestDataSwitch } from './utils/addTestDataSwitch.mjs';
 import { addV2OutputV2 } from './utils/addV2OutputV2.mjs';
-// import { addV2OutputV2Bucket } from './utils/addV2OutputV2Bucket.mjs';
 import { addWNextFenV2 } from './utils/addWNextFenV2.mjs';
-// import { addStockFishData } from './utils/addStockFishData.mjs';
 import { getEndingData } from './utils/getEndingData.mjs';
 import { addMoveIndicatorsV2 } from './utils/addMoveIndicatorsV2.mjs';
 import { addLmfLmt } from './utils/addLmfLmt.mjs';
 import { addFlippedAndRotatedV2 } from './utils/addFlippedAndRotatedV2.mjs';
-// const { getStockfishSearchScore, getMovedFen, getStockfishAllMoves } = pkg1;
 
 const BATCH_SIZE = 100;
 const parentFolder = 'data/2300+';
@@ -156,7 +152,6 @@ const processHtml = async ({ htmlContent, filename }) => {
 
     return {
       filename,
-
       result: origResult,
 
       chkmate_ending,
@@ -164,8 +159,6 @@ const processHtml = async ({ htmlContent, filename }) => {
       aborted_ending,
 
       total_moves,
-      rnd: Math.random(),
-
       records,
     };
   } catch (e) {
@@ -216,59 +209,7 @@ const getBalance = ({ fen }) => {
     balance: Math.round(balance * 100),
     piece_count,
   };
-
-  // return {Math.round(chars.reduce((p, c) => p + (pieceValues[c] || 0), 0) * 100);
 };
-
-// const finishGame = async ({ fens, origResult, filename }) => {
-//   let result = origResult;
-//   const extendedFens = fens.slice();
-//   let fensAdded = 0;
-
-//   if (result === 0) {
-//     return { extendedFens, result, fensAdded };
-//   }
-
-//   let fen = fens[fens.length - 1];
-//   for (let i = 0; i < 150; i += 1) {
-//     const { bestmove } = await getStockfishSearchScore(fen, 14);
-//     if (!bestmove) {
-//       const sideToMove = fen.split(' ')[1];
-//       if ((sideToMove === 'w' && result !== -1) || (sideToMove === 'b' && result !== 1)) {
-//         throw new Error(`result has changed r: ${origResult}, lastFen: ${fens[fens.length - 1]} filename: ${filename}`);
-//       }
-
-//       return { extendedFens, result, fensAdded };
-//     }
-
-//     fen = await getMovedFen(bestmove, fen);
-//     extendedFens.push(fen);
-//     fensAdded += 1;
-//   }
-
-//   throw new Error(`couldn't finish game in 150 moves r: ${origResult}, lastFen: ${fens[fens.length - 1]}`);
-// };
-
-// CREATE TABLE scid_records (
-
-//   move_from SMALLINT NOT NULL,
-//   move_to SMALLINT NOT NULL,
-//   becomes_knight BOOL NOT NULL,
-//   resign_now BOOL NOT NULL,
-
-//   lmf SMALLINT[64] NOT NULL,
-//   lmt SMALLINT[64] NOT NULL,
-
-//   all_moves SMALLINT[],
-
-//   chkmate_ending BOOL NOT NULL,
-//   stall_ending BOOL NOT NULL,
-//   aborted_ending BOOL NOT NULL,
-//
-
-// )
-
-// const pruneRecord = (r) => console.log(Object.keys(r)) || r;
 
 const pruneRecord = ({
   filename,
@@ -280,6 +221,7 @@ const pruneRecord = ({
   stall_ending,
   aborted_ending,
   piece_count,
+  hits_left,
   is_opening,
   is_midgame,
   is_endgame,
@@ -292,11 +234,12 @@ const pruneRecord = ({
   onehot_move,
   lmf,
   lmt,
+  version,
 }) => ({
   fen,
 
   movestr,
-  onehot_move: onehot_move,
+  onehot_move,
 
   hit_soon,
   chkmate_soon,
@@ -309,6 +252,7 @@ const pruneRecord = ({
 
   balance: wNextBalance,
   piece_count,
+  hits_left,
 
   is_opening,
   is_midgame,
@@ -322,6 +266,7 @@ const pruneRecord = ({
   lmf,
   lmt,
 
+  version,
   rnd: Math.random(),
   test: Math.random() > 0.99, // 1% is still around 1.4M test samples
 });
@@ -421,11 +366,6 @@ const readGames = async () => {
       const htmlContent = await fs.readFile(path.resolve(folderName, filename), 'utf-8');
       const game = await processHtml({ htmlContent, filename });
 
-      // if (game) {
-      //   console.log({ game, l: game.records[game.records.length - 1], f: game.records[0] });
-      //   process.exit(0);
-      // }
-
       if (htmlContent && !game) continue;
 
       result.push({ gameIndex: fileIndex - 1, game, filename, folderName });
@@ -455,19 +395,3 @@ const run = async () => {
 };
 
 run();
-
-// CREATE TABLE scid_games (
-//   filename VARCHAR(255) PRIMARY KEY,
-
-//   white_won BOOL NOT NULL,
-//   black_won BOOL NOT NULL,
-//   draw BOOL NOT NULL,
-
-//   chkmate_ending BOOL NOT NULL,
-//   stall_ending BOOL NOT NULL,
-//   aborted_ending BOOL NOT NULL,
-
-//   total_moves SMALLINT NOT NULL,
-
-//   rnd FLOAT(16)
-// )
