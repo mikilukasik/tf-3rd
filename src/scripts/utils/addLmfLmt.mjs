@@ -42,16 +42,11 @@ export const addLmfLmt = ({ record, records, index: i }) => {
   const fens = records.slice(0, i + 1).map((r) => r.orig_fen);
   const moves = records.slice(0, i + 1).map((r) => r.orig_move_indexes);
 
-  // console.log(fens);
-  // console.log(i);
-  // process.exit(0);
-
   if (!wNext)
     fens.forEach((f, i) => {
       if (fens[i]) fens[i] = mirrorer(f);
     });
 
-  // const i = records.length - 1;
   const lastMovedFrom = new Array(64).fill(255).map((val, cellIndex) => {
     let lookBackIndex = i;
     while (lookBackIndex--) {
@@ -61,7 +56,6 @@ export const addLmfLmt = ({ record, records, index: i }) => {
     }
     return 255;
   });
-  // .map((val) => val.toString(16).padStart(2, '0'));
 
   const lastMovedTo = new Array(64).fill(255).map((val, cellIndex) => {
     let lookBackIndex = i;
@@ -72,10 +66,9 @@ export const addLmfLmt = ({ record, records, index: i }) => {
     }
     return 255;
   });
-  // .map((val) => val.toString(16).padStart(2, '0'));
 
-  const lmf = (!wNext ? mirrorFlatArray : (e) => e)(lastMovedFrom); //.join('');
-  const lmt = (!wNext ? mirrorFlatArray : (e) => e)(lastMovedTo); //.join('');
+  const lmf = (!wNext ? mirrorFlatArray : (e) => e)(lastMovedFrom);
+  const lmt = (!wNext ? mirrorFlatArray : (e) => e)(lastMovedTo);
 
   return Object.assign({}, record, {
     lmf,

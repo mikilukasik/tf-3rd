@@ -9,6 +9,7 @@ import { addWNextFenV2 } from './utils/addWNextFenV2.mjs';
 import { getEndingData } from './utils/getEndingData.mjs';
 import { addMoveIndicatorsV2 } from './utils/addMoveIndicatorsV2.mjs';
 import { addLmfLmt } from './utils/addLmfLmt.mjs';
+import { addFlippedAndRotatedV2 } from './utils/addFlippedAndRotatedV2.mjs';
 // const { getStockfishSearchScore, getMovedFen, getStockfishAllMoves } = pkg1;
 
 const BATCH_SIZE = 100;
@@ -271,11 +272,9 @@ const getBalance = ({ fen }) => {
 
 const pruneRecord = ({
   filename,
-  rnd,
   total_moves,
   move_index,
   is_last,
-  test,
   draw,
   chkmate_ending,
   stall_ending,
@@ -290,14 +289,14 @@ const pruneRecord = ({
   hit_soon,
   chkmate_soon,
   movestr,
-  best_move,
+  onehot_move,
   lmf,
   lmt,
 }) => ({
   fen,
 
   movestr,
-  onehot_move: best_move,
+  onehot_move: onehot_move,
 
   hit_soon,
   chkmate_soon,
@@ -323,8 +322,8 @@ const pruneRecord = ({
   lmf,
   lmt,
 
-  rnd,
-  test,
+  rnd: Math.random(),
+  test: Math.random() > 0.99, // 1% is still around 1.4M test samples
 });
 
 const getRecords = async ({ fens, origResult, filename }) => {
@@ -342,11 +341,10 @@ const getRecords = async ({ fens, origResult, filename }) => {
       filename,
       balance,
       balancesAhead: [balance],
-      rnd: Math.random(),
       total_moves,
       move_index,
+      version: 0,
       is_last: move_index === total_moves,
-      test: Math.random() > 0.99, // 1% is still around 1.4M test samples
       draw: origResult === 0,
       chkmate_ending,
       stall_ending,
@@ -369,12 +367,19 @@ const getRecords = async ({ fens, origResult, filename }) => {
     return recordWithMove;
   });
 
-  const newRecords = recordsWithMoveIndicators.map((record, index) => {
-    const recordWithLmfLmt = addLmfLmt({ record, records: recordsWithMoveIndicators, index });
-    return pruneRecord(recordWithLmfLmt);
+  const recordsWithLmfLmt = recordsWithMoveIndicators.map((record, index) => {
+    return addLmfLmt({ record, records: recordsWithMoveIndicators, index });
   });
 
-  return { records: newRecords, chkmate_ending, stall_ending, aborted_ending, total_moves };
+  const newRecords = addFlippedAndRotatedV2(recordsWithLmfLmt);
+
+  return {
+    records: newRecords.map(pruneRecord),
+    chkmate_ending,
+    stall_ending,
+    aborted_ending,
+    total_moves,
+  };
 };
 
 const readGames = async () => {
