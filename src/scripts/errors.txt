@@ -1,0 +1,108 @@
+processed 16099 of 917145 games.
+processed 16199 of 917145 games.
+processed 16299 of 917145 games.
+TypeError: Cannot read properties of undefined (reading 'undefined')
+    at addMoveIndicatorsV2 (file:///Users/miki/dev/tensorflow/3rd/src/scripts/utils/addMoveIndicatorsV2.mjs:96:81)
+    at file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:375:28
+    at Array.map (<anonymous>)
+    at getRecords (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:372:45)
+    at async processHtml (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:208:84)
+    at async getNextGames (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:432:20)
+    at async run (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:454:89)
+{ filename: '2300+_hm99-103_49473.html' }
+processed 16398 of 917145 games.
+processed 16498 of 917145 games.
+processed 16598 of 917145 games.
+processed 16698 of 917145 games.
+
+
+900 of 917145 games.
+processed 4000 of 917145 games.
+TypeError: Cannot read properties of undefined (reading 'undefined')
+    at addMoveIndicatorsV2 (file:///Users/miki/dev/tensorflow/3rd/src/scripts/utils/addMoveIndicatorsV2.mjs:96:81)
+    at file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:375:28
+    at Array.map (<anonymous>)
+    at getRecords (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:372:45)
+    at async processHtml (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:208:84)
+    at async getNextGames (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:432:20)
+    at async run (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:454:89)
+{ filename: '2300+_hm166-172_38793.html' }
+processed 4099 of 917145 games.
+processed 4199 of 917145 games.
+processed 4299 of 917145 games.
+processed 4399 of 917145
+
+
+
+image.png
+processed 24096 of 917145 games.
+processed 24196 of 917145 games.
+processed 24296 of 917145 games.
+TypeError: Cannot read properties of undefined (reading '43')
+    at addMoveIndicatorsV2 (file:///Users/miki/dev/tensorflow/3rd/src/scripts/utils/addMoveIndicatorsV2.mjs:96:57)
+    at file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:375:28
+    at Array.map (<anonymous>)
+    at getRecords (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:372:45)
+    at async processHtml (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:208:84)
+    at async getNextGames (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:432:20)
+    at async run (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:454:89)
+{ filename: '2300+_hm181-190_36568.html' }
+processed 24395 of 917145 games.
+processed 24495 of 917145 games.
+processed 24595 of 917145 games.
+
+ssed 19298 of 917145 games.
+TypeError: Cannot read properties of undefined (reading 'undefined')
+    at addMoveIndicatorsV2 (file:///Users/miki/dev/tensorflow/3rd/src/scripts/utils/addMoveIndicatorsV2.mjs:96:81)
+    at file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:375:28
+    at Array.map (<anonymous>)
+    at getRecords (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:372:45)
+    at async processHtml (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:208:84)
+    at async getNextGames (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:432:20)
+    at async run (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:454:89)
+{ filename: '2300+_hm146-152_54157.html' }
+processed 19397 of 917145 games.
+processed 19497 of 917145 games.
+processed 19597 of 917145 games.
+processed 19697 of 917145 games.
+processed 19797 of 917145 games.
+TypeError: Cannot read properties of undefined (reading 'undefined')
+    at addMoveIndicatorsV2 (file:///Users/miki/dev/tensorflow/3rd/src/scripts/utils/addMoveIndicatorsV2.mjs:96:81)
+    at file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:375:28
+    at Array.map (<anonymous>)
+    at getRecords (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:372:45)
+    at async processHtml (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:208:84)
+    at async getNextGames (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:432:20)
+    at async run (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:454:89)
+{ filename: '2300+_hm181-190_36570.html' }
+processed 19896 of 917145 games.
+processed 19996 of 917145 games.
+processed 20096 of 917145 games.
+processed 20196 of 917145 games.
+processed 20296 of 917145 games.
+processed 20396 of 917145 games.
+processed 20496 of 917145 games.
+processed 20596 of 917145 games.
+processed 20696 of 917145 games.
+processed 20796 of 917145 games.
+processed 20896 of 917145 games.
+processed 20996 of 917145 games.
+
+
+processed 40895 of 544773 games.
+processed 40995 of 544773 games.
+processed 41095 of 544773 games.
+TypeError: Cannot read properties of undefined (reading 'undefined')
+    at addMoveIndicatorsV2 (file:///Users/miki/dev/tensorflow/3rd/src/scripts/utils/addMoveIndicatorsV2.mjs:96:81)
+    at file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:375:28
+    at Array.map (<anonymous>)
+    at getRecords (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:372:45)
+    at async processHtml (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:208:84)
+    at async getNextGames (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:441:20)
+    at async run (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:466:89)
+{ filename: '2300+_hm166-172_38793.html' }
+processed 41194 of 544773 games.
+processed 41294 of 544773 games.
+processed 41394 of 544773 games.
+processed 41494 of 544773 games.
+processed 41594 of 544773 games.

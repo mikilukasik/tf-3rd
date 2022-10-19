@@ -9,11 +9,15 @@ export const addWNextFenV2 = (record) => ({
         wNextBalancesAhead: record.balancesAhead,
         wNextBalance: record.balance,
         wNextResult: record.origResult,
+        won: record.origResult === 1,
+        lost: record.origResult === -1,
       }
     : {
         fen: getWhiteNextFen({ fen: record.orig_fen }).fen,
         wNextBalancesAhead: record.balancesAhead.map((val) => val * -1),
         wNextBalance: record.balance * -1,
         wNextResult: record.origResult * -1,
+        won: record.origResult === -1,
+        lost: record.origResult === 1,
       }),
 });

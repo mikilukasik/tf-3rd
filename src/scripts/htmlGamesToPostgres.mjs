@@ -1,32 +1,93 @@
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { MongoClient } from 'mongodb';
 import { addV2OutputV2 } from './utils/addV2OutputV2.mjs';
 import { addWNextFenV2 } from './utils/addWNextFenV2.mjs';
 import { getEndingData } from './utils/getEndingData.mjs';
 import { addMoveIndicatorsV2 } from './utils/addMoveIndicatorsV2.mjs';
 import { addLmfLmt } from './utils/addLmfLmt.mjs';
 import { addFlippedAndRotatedV2 } from './utils/addFlippedAndRotatedV2.mjs';
+import { discWriter } from './utils/discWriter.mjs';
+import { shuffle } from '../../chss-module-engine/src/utils/schuffle.js';
+
+import pkg from 'pg';
+const { Client } = pkg;
+const pgClient = new Client({
+  user: 'chss',
+  host: 'localhost',
+  database: 'chss',
+  password: 'password',
+  port: 54320,
+});
 
 const BATCH_SIZE = 100;
-const parentFolder = 'data/2300+';
+const parentFolder = 'data/2300+_html/2300+';
 
-const client = new MongoClient('mongodb://0.0.0.0:27017');
-let db;
+let groupFolder = 1;
 
-const collections = {};
+const {
+  writeRecordToDisc,
+  writeCache: writeDiscCache,
+  updateStatsFile,
+} = discWriter({
+  recordsFolder: 'data/newestCsvs',
+  groups: ({
+    fen,
+    movestr,
+    onehot_move,
+    hit_soon,
+    chkmate_soon,
+    result,
+    draw,
+    won,
+    lost,
+    chkmate_ending,
+    stall_ending,
+    aborted_ending,
+    balance,
+    piece_count,
+    hits_left,
+    is_opening,
+    is_midgame,
+    is_endgame,
+    filename,
+    move_index,
+    total_moves,
+    is_last,
+    lmf,
+    lmt,
+    version,
+    rnd,
+    test,
+  }) => {
+    const filter = () => true; //wr === 1 && wm && wm.length === 2;
+    const transform = () =>
+      [
+        fen,
+        onehot_move,
+        hit_soon,
+        chkmate_soon,
+        result,
+        chkmate_ending,
+        stall_ending,
+        is_opening ? 0 : is_midgame ? 1 : 2,
+        is_last,
+        lmf.map((val) => val.toString(16).padStart(2, '0')).join(''),
+        lmt.map((val) => val.toString(16).padStart(2, '0')).join(''),
+      ].join(',');
 
-const connect = async () => {
-  await client.connect();
-  db = client.db('chss');
-};
-
-const getCollection = async (collecitonName) => {
-  if (collections[collecitonName]) return collections[collecitonName];
-  if (!db) await connect();
-  collections[collecitonName] = db.collection(collecitonName);
-  return collections[collecitonName];
-};
+    return [
+      {
+        groupName: 'newest2',
+        // filter,
+        getPath: () => {
+          if (groupFolder === 501) groupFolder = 1;
+          return (groupFolder++).toString().padStart(3, '0');
+        },
+        transform,
+      },
+    ];
+  },
+});
 
 const expandGroupedBlanks = (rowStr) => {
   let result = rowStr;
@@ -216,6 +277,8 @@ const pruneRecord = ({
   total_moves,
   move_index,
   is_last,
+  won,
+  lost,
   draw,
   chkmate_ending,
   stall_ending,
@@ -246,6 +309,8 @@ const pruneRecord = ({
 
   result: wNextResult,
   draw,
+  won,
+  lost,
   chkmate_ending,
   stall_ending,
   aborted_ending,
@@ -327,7 +392,7 @@ const getRecords = async ({ fens, origResult, filename }) => {
   };
 };
 
-const readGames = async () => {
+const readGames = async ({ skipFilenames = [] }) => {
   const sourceDirs = (await fs.readdir(parentFolder)).map((fName) => path.resolve(parentFolder, fName));
   let sdIndex = sourceDirs.length;
   while (sdIndex--) {
@@ -348,9 +413,18 @@ const readGames = async () => {
     )
   ).flat();
 
-  const validFilesArray = allFilesArray.filter(({ filename }) => /_\d+.html$/.test(filename));
+  const skippedHash = skipFilenames.reduce((p, c) => {
+    p[c] = true;
+    return p;
+  }, {});
+
+  const allFilesArrayWithoutSkipped = allFilesArray.filter(({ filename }) => !skippedHash[filename]);
+
+  const validFilesArray = shuffle(allFilesArrayWithoutSkipped.filter(({ filename }) => /_\d+.html$/.test(filename)));
   const validFilesCount = validFilesArray.length;
-  console.log(`Found ${validFilesCount} valid files out of ${allFilesArray.length} total files.`);
+  console.log(
+    `Found ${validFilesCount} valid files out of ${allFilesArray.length} total files. (${skipFilenames.length} files were already processed)`,
+  );
 
   let fileIndex = 0;
 
@@ -378,20 +452,67 @@ const readGames = async () => {
 };
 
 const run = async () => {
-  const { getNextGames, validFilesCount } = await readGames();
-  const collection = await getCollection('scidGamesV2');
+  await pgClient.connect();
+
+  const res = await pgClient.query('SELECT $1::text as message', ['Postgres connected']);
+  console.log(res.rows[0].message); // Hello world!
+
+  const filenamesInDb = (await pgClient.query('SELECT filename FROM public.scid_games')).rows.map((e) => e.filename);
+  console.log(`There are ${filenamesInDb.length} files already processed in the db.`);
+
+  const { getNextGames, validFilesCount } = await readGames({ skipFilenames: filenamesInDb });
 
   let processed = 0;
   for (let nextGames = await getNextGames(); nextGames && nextGames.length; nextGames = await getNextGames()) {
     const mongoRecords = nextGames.map(({ game }) => game);
 
-    await collection.insertMany(mongoRecords);
+    const gameKeys = Object.keys(mongoRecords[0]).filter((key) => key !== 'records');
+    const recordKeys = Object.keys(mongoRecords[0].records[0]);
+
+    const gamesUpdateVals = [];
+    const recordsUpdateVals = [];
+
+    let i = mongoRecords.length;
+
+    while (i--) {
+      const game = { ...mongoRecords[i], records: undefined };
+      const records = mongoRecords[i].records; //.slice(-1);
+
+      await writeRecordToDisc(records);
+
+      gamesUpdateVals.push(`(${gameKeys.map((key) => `'${game[key]}'`).join(',')})`);
+
+      recordsUpdateVals.push(
+        ...records.map(
+          (record) =>
+            `(${recordKeys
+              .map((key) =>
+                Array.isArray(record[key])
+                  ? `'{${record[key].map((val) => `"${val}"`).join(',')}}'`
+                  : record[key] === null
+                  ? 'NULL'
+                  : `'${record[key]}'`,
+              )
+              .join(',')})`,
+        ),
+      );
+    }
+
+    const pgGamesPromise = pgClient.query(
+      `INSERT INTO scid_games (${gameKeys.join(', ')}) VALUES ${gamesUpdateVals.join(',')}`,
+    );
+    const pgRecordsPromise = pgClient.query(
+      `INSERT INTO scid_records (${recordKeys.join(', ')}) VALUES ${recordsUpdateVals.join(',')}`,
+    );
+
+    await Promise.all([pgGamesPromise, pgRecordsPromise]);
 
     processed += mongoRecords.length;
     console.log(`processed ${processed} of ${validFilesCount} games.`);
   }
-
-  client.close();
+  await writeDiscCache();
 };
 
-run();
+run()
+  .catch(console.error)
+  .then(() => pgClient.end());

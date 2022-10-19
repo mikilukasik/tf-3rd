@@ -50,7 +50,12 @@ export const discWriter = ({ groups, recordsFolder, gamesFolder = 'default' }) =
       for (const { groupName, filter, getPath, transform } of Array.isArray(groups) ? groups : groups(record)) {
         if (filter && !filter(record)) continue;
 
-        const folder = path.resolve(recordsFolder, groupName, `test-${record.t}`, getPath(record));
+        const folder = path.resolve(
+          recordsFolder,
+          groupName,
+          `test-${Boolean(record.t || record.test)}`,
+          getPath(record),
+        );
 
         if (!cache[folder]) {
           cache[folder] = [];
