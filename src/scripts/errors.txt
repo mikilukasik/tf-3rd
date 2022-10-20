@@ -106,3 +106,23 @@ processed 41294 of 544773 games.
 processed 41394 of 544773 games.
 processed 41494 of 544773 games.
 processed 41594 of 544773 games.
+
+
+processed 136580 of 544773 games.
+processed 136680 of 544773 games.
+processed 136780 of 544773 games.
+processed 136880 of 544773 games.
+TypeError: Cannot read properties of undefined (reading 'undefined')
+    at addMoveIndicatorsV2 (file:///Users/miki/dev/tensorflow/3rd/src/scripts/utils/addMoveIndicatorsV2.mjs:96:81)
+    at file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:375:28
+    at Array.map (<anonymous>)
+    at getRecords (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:372:45)
+    at async processHtml (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:208:84)
+    at async getNextGames (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:441:20)
+    at async run (file:///Users/miki/dev/tensorflow/3rd/src/scripts/htmlGamesToPostgres.mjs:466:89)
+{ filename: '2300+_hm173-180_34987.html' }
+processed 136979 of 544773 games.
+processed 137079 of 544773 games.
+processed 137179 of 544773 games.
+processed 137279 of 544773 games.
+processed 137379 of 544773 games.
