@@ -6,24 +6,24 @@ import { getXs } from './transform.js';
 
 const datasetFolder = './data/newestCsvs/newest2'; //  /newest and /newest2
 
-const initialSourceModelDirName = 'models/pg1_small_v1';
-const targetModelName = 'models/pg1_small_v1';
+const initialSourceModelDirName = 'models/pg1_small_v1_0.001/2.40049481-1666223914108';
+const targetModelName = 'models/pg1_small_v1x';
 
 // [wr, wf, i, p, o2, lmf, lmt, wm ? movesToOneHot[wm[0]][wm[1]] : '-', s]
-const filter = (data) => Number(data[2]) >= 0; //|| Math.random() < 0.01; //mostly good moves
+const filter = (data) => Number(data[2]) >= 0 || Number(data[3]) > 0.0001; //|| Math.random() < 0.01; //mostly good moves
 
 const filesToCopy = {
   'createModelPg1.js': path.resolve(initialSourceModelDirName, 'createModelPg1.js'),
   'train.mjs': './trainPgModelNoDupes.mjs', // todo: read only once at the beginning, in case file changes during training
-  // 'transforms.js': 'src/lib/bundledTransforms/pg_transforms.js',
+  'transforms.js': 'src/lib/bundledTransforms/pg_transforms.js',
 };
 
 const recordsPerDataset = 30000;
-const testRecordsPerDataset = 15000;
+const testRecordsPerDataset = 20000;
 const batchSize = 5000;
 const maxIterationsWithoutImprovement = 10;
-const iterationsPerEval = 5;
-const dupeCacheMinutes = 30;
+const iterationsPerEval = 7;
+const dupeCacheMinutes = 60;
 
 const initialLearningRate = 0.001;
 const finalLearningRate = 0.000002;
