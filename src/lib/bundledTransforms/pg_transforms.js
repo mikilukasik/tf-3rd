@@ -1,6 +1,8 @@
 ({ tf }) => {
   console.log('initialising pg model transforms.');
 
+  const pieces = ['', 'p', 'b', 'n', 'r', 'q', 'k', '', '', 'P', 'B', 'N', 'R', 'Q', 'K'];
+
   const oneHotToMovesMap = [
     [0, 9, ''],
     [0, 18, ''],
@@ -1841,10 +1843,12 @@
     [0, 0, ''],
   ].map(([source, target, piece]) => {
     // TODO: add knight promotion and resign logic here
-    return (source << 10) + target;
+    return (source << 10) + target + (piece ? pieces.indexOf(piece.toUpperCase()) << 6 : 0);
+    // (move >>> 6) & 15;
   });
 
-  const getMoveString = (move) => `${cellIndex2cellStr(move >>> 10)}${cellIndex2cellStr(move & 63)}`;
+  const getMoveString = (move) =>
+    `${cellIndex2cellStr(move >>> 10)}${cellIndex2cellStr(move & 63)}${pieces[(move >>> 6) & 15]}`;
 
   const mirrorCell = (cellIndex) => {
     const rank = cellIndex >>> 3; // equals to rank
@@ -1857,7 +1861,10 @@
     const sourceIndex = move >>> 10;
     const targetIndex = move & 63;
 
-    return (mirrorCell(sourceIndex) << 10) + mirrorCell(targetIndex);
+    const piece = (move >>> 6) & 15;
+    const newPiece = piece ? piece ^ 8 : 0;
+
+    return (mirrorCell(sourceIndex) << 10) + mirrorCell(targetIndex) + (newPiece << 6);
   };
 
   const cellIndex2cellStr = (index) => `${String.fromCharCode((index % 8) + 97)}${8 - Math.floor(index / 8)}`;
@@ -2028,14 +2035,28 @@
     // return [0, 0];
   };
 
-  const ysToStats = ({ ys, game: { wNext, nextMoves } }) => {
+  const addQueenPromotion = (move, board) => {
+    const piece = (move >>> 6) & 15;
+    if (piece) return move;
+
+    const sourceIndex = move >>> 10;
+    const targetIndex = move & 63;
+
+    if (board[sourceIndex] === 1 && targetIndex >= 56) return move + (5 << 6);
+    if (board[sourceIndex] === 9 && targetIndex < 8) return move + (13 << 6);
+
+    return move;
+  };
+
+  const ysToStats = ({ ys, game: { wNext, nextMoves, board } }) => {
     const moveValues = ys.reduce((p, val, i) => {
-      p[wNext ? oneHotToMovesMap[i] : mirrorMove(oneHotToMovesMap[i])] = val;
+      p[addQueenPromotion(wNext ? oneHotToMovesMap[i] : mirrorMove(oneHotToMovesMap[i]), board)] = val;
       return p;
     }, {});
 
     const moveStringValues = oneHotToMovesMap.reduce((p, move, i) => {
-      p[wNext ? getMoveString(move) : getMoveString(mirrorMove(move))] = ys[i];
+      const m = addQueenPromotion(wNext ? move : mirrorMove(move), board);
+      p[getMoveString(m)] = ys[i];
       return p;
     }, {});
 

@@ -1,19 +1,23 @@
 import tf from '@tensorflow/tfjs-node';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { datasetReaderV2 } from './src/scripts/utils/getMovesDatasetPg.mjs';
+import { datasetReaderV3 } from './src/scripts/utils/getMovesDatasetPgV3.mjs';
 import { getXs } from './transform.js';
 
 const datasetFolder = './data/newestCsvs/newest2'; //  /newest and /newest2
 
-const initialSourceModelDirName = 'models/pg1_small_v1_0.001/2.40049481-1666223914108';
-const targetModelName = 'models/pg1_small_v1x';
+// const initialSourceModelDirName = 'models/pg1_small_v1x_0.000015625/2.17783642-1666323282932';
+const initialSourceModelDirName = 'models/pg1_large_v1';
+const targetModelName = 'models/pg1_large_v1x';
 
 // [wr, wf, i, p, o2, lmf, lmt, wm ? movesToOneHot[wm[0]][wm[1]] : '-', s]
-const filter = (data) => Number(data[2]) >= 0 || Number(data[3]) > 0.0001; //|| Math.random() < 0.01; //mostly good moves
+const filter = (data) => Number(data[2]) >= 0 || Number(data[3]) > 0.0001; //|| Math.random() < 0.01;
 
 const filesToCopy = {
-  'createModelPg1.js': path.resolve(initialSourceModelDirName, 'createModelPg1.js'),
+  // 'createModelPg1Tiny.js': path.resolve(initialSourceModelDirName, 'createModelPg1Tiny.js'),
+  'createModelPg1Large.js': path.resolve(initialSourceModelDirName, 'createModelPg1Large.js'),
+
+  // 'createModelPg1.js': path.resolve(initialSourceModelDirName, 'createModelPg1.js'),
   'train.mjs': './trainPgModelNoDupes.mjs', // todo: read only once at the beginning, in case file changes during training
   'transforms.js': 'src/lib/bundledTransforms/pg_transforms.js',
 };
@@ -23,9 +27,9 @@ const testRecordsPerDataset = 20000;
 const batchSize = 5000;
 const maxIterationsWithoutImprovement = 10;
 const iterationsPerEval = 7;
-const dupeCacheMinutes = 60;
+const dupeCacheSize = 2000000;
 
-const initialLearningRate = 0.001;
+const initialLearningRate = 0.0005; //0.000125; //0.000015625; //0.001;
 const finalLearningRate = 0.000002;
 const makeTrainableBelowLr = 0; //0.00005;
 
@@ -36,16 +40,16 @@ let testData;
 let alreadySetTrainable = false;
 
 const loadTestData = async () => {
-  const { getNextBatch } = await datasetReaderV2({
+  const { getNextBatch } = await datasetReaderV3({
     folder: path.resolve(datasetFolder),
     test: true,
     batchSize: testRecordsPerDataset,
     filter,
     //noDupes: true,
-    dupeCacheMinutes,
+    dupeCacheSize: 100000,
   });
 
-  console.log('datasetReaderV2 for test samples initialized, getting test samples...');
+  console.log('datasetReaderV3 for test samples initialized, getting test samples...');
   const rawTestData = await getNextBatch();
   console.log(`Loaded ${rawTestData.length} test samples.`);
   testData = loadData(rawTestData.map(transformRecord).filter(Boolean));
@@ -282,15 +286,15 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
   try {
     if (!alreadyInited)
       getNextDatasets = await (async () => {
-        const { getNextBatch } = await datasetReaderV2({
+        const { getNextBatch } = await datasetReaderV3({
           folder: path.resolve(datasetFolder),
           test: false,
           batchSize: recordsPerDataset,
           filter,
           //noDupes: true, //per batch
-          dupeCacheMinutes,
+          dupeCacheSize,
         });
-        console.log('datasetReaderV2 for lessons initialized');
+        console.log('datasetReaderV3 for lessons initialized');
         return async ({ iterationIndex } = {}) => {
           // console.log({ iterationIndex });
           const records = await getNextBatch();

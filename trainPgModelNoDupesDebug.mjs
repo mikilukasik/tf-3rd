@@ -7,19 +7,18 @@ import { getXs } from './transform.js';
 const datasetFolder = './data/newestCsvs/newest2'; //  /newest and /newest2
 
 // const initialSourceModelDirName = 'models/pg1_small_v1x_0.000015625/2.17783642-1666323282932';
-
-const initialSourceModelDirName = 'models/pg1_tiny_v1_0.000125/2.32051945-1666330267939';
-const targetModelName = 'models/pg1_tiny_v1x';
+const initialSourceModelDirName = 'models/pg1_tiny_v1';
+const targetModelName = 'models/pg1_test_delete';
 
 // [wr, wf, i, p, o2, lmf, lmt, wm ? movesToOneHot[wm[0]][wm[1]] : '-', s]
 const filter = (data) => Number(data[2]) >= 0 || Number(data[3]) > 0.0001; //|| Math.random() < 0.01;
 
 const filesToCopy = {
-  'createModelPg1Tiny.js': path.resolve(initialSourceModelDirName, 'createModelPg1Tiny.js'),
-
-  // 'createModelPg1.js': path.resolve(initialSourceModelDirName, 'createModelPg1.js'),
-  'train.mjs': './trainPgModelNoDupes.mjs', // todo: read only once at the beginning, in case file changes during training
-  'transforms.js': 'src/lib/bundledTransforms/pg_transforms.js',
+  // // 'createModelPg1Tiny.js': path.resolve(initialSourceModelDirName, 'createModelPg1Tiny.js'),
+  // 'createModelPg1Large.js': path.resolve(initialSourceModelDirName, 'createModelPg1Large.js'),
+  // // 'createModelPg1.js': path.resolve(initialSourceModelDirName, 'createModelPg1.js'),
+  // 'train.mjs': './trainPgModelNoDupes.mjs', // todo: read only once at the beginning, in case file changes during training
+  // 'transforms.js': 'src/lib/bundledTransforms/pg_transforms.js',
 };
 
 const recordsPerDataset = 30000;
@@ -29,7 +28,7 @@ const maxIterationsWithoutImprovement = 10;
 const iterationsPerEval = 7;
 const dupeCacheSize = 2000000;
 
-const initialLearningRate = 0.000125; //0.000015625; //0.001;
+const initialLearningRate = 0.0005; //0.000125; //0.000015625; //0.001;
 const finalLearningRate = 0.000002;
 const makeTrainableBelowLr = 0; //0.00005;
 
@@ -134,71 +133,77 @@ const trainModel = async function ({ model, trainData }) {
 
 // verify the model against the test data
 const evaluateModel = async function ({ model, tempFolder }) {
-  console.log(`Tensors in memory before eval: ${tf.memory().numTensors}`);
+  console.log('skipping eval');
 
-  const evalResult = await model.evaluateDataset(testData);
+  return { loss: 1, categoricalCrossentropy: 1 };
 
-  const [loss, categoricalCrossentropy] = evalResult.map((r) =>
-    r
-      .dataSync()
-      .join()
-      .split()
-      .map((n) => Number(n).toFixed(8))
-      .join(', '),
-  );
+  // console.log(`Tensors in memory before eval: ${tf.memory().numTensors}`);
 
-  const result = { loss, categoricalCrossentropy };
+  // const evalResult = await model.evaluateDataset(testData);
 
-  if (tempFolder)
-    await fs.writeFile(
-      path.resolve(tempFolder, 'evaluation.json'),
-      JSON.stringify({ ...result, evalResult }, null, 2),
-      'utf8',
-    );
+  // const [loss, categoricalCrossentropy] = evalResult.map((r) =>
+  //   r
+  //     .dataSync()
+  //     .join()
+  //     .split()
+  //     .map((n) => Number(n).toFixed(8))
+  //     .join(', '),
+  // );
 
-  evalResult.forEach((t) => t.dispose());
-  console.log(`Tensors in memory after eval: ${tf.memory().numTensors}`);
+  // const result = { loss, categoricalCrossentropy };
 
-  return result;
+  // if (tempFolder)
+  //   await fs.writeFile(
+  //     path.resolve(tempFolder, 'evaluation.json'),
+  //     JSON.stringify({ ...result, evalResult }, null, 2),
+  //     'utf8',
+  //   );
+
+  // evalResult.forEach((t) => t.dispose());
+  // console.log(`Tensors in memory after eval: ${tf.memory().numTensors}`);
+
+  // return result;
 };
 
 let getNextDatasets;
 
 const saveModel = async ({ model, modelDirName }) => {
-  console.log('\n--------------------------------');
-  console.log('Saving model...', { modelDirName });
+  console.log('skipping save');
+  // console.log('\n--------------------------------');
+  // console.log('Saving model...', { modelDirName });
 
-  await model.save(`file://${modelDirName}`);
+  // await model.save(`file://${modelDirName}`);
 
-  await Promise.all(
-    Object.keys(filesToCopy).map((targetFileName) =>
-      fs.copyFile(path.resolve(filesToCopy[targetFileName]), path.resolve(modelDirName, targetFileName)),
-    ),
-  );
+  // await Promise.all(
+  //   Object.keys(filesToCopy).map((targetFileName) =>
+  //     fs.copyFile(path.resolve(filesToCopy[targetFileName]), path.resolve(modelDirName, targetFileName)),
+  //   ),
+  // );
 
-  console.log('done');
-  console.log('--------------------------------\n');
+  // console.log('done');
+  // console.log('--------------------------------\n');
 };
 
 const runIteration = async ({ model, iterationIndex }) => {
-  tf.engine().startScope();
+  // tf.engine().startScope();
 
   const dataset = await getNextDatasets({ iterationIndex });
   if (!dataset) {
     throw new Error('no dataset loaded');
   }
 
-  const { trainData: rawTrainData } = dataset;
+  // const { trainData: rawTrainData } = dataset;
 
-  const trainData = loadData(rawTrainData.map(transformRecord).filter(Boolean));
+  // const trainData = loadData(rawTrainData.map(transformRecord).filter(Boolean));
 
-  await trainModel({
-    model,
-    trainData,
-    iterationIndex,
-  });
+  console.log('skipping training');
+  // await trainModel({
+  //   model,
+  //   trainData,
+  //   iterationIndex,
+  // });
 
-  tf.engine().endScope();
+  // tf.engine().endScope();
 };
 
 // run
@@ -218,7 +223,7 @@ const run = async function () {
     let iterationsWithNoImprovement = 0;
     let nextEvalIn = 0;
     do {
-      await await runIteration({ model });
+      await runIteration({ model });
 
       if (nextEvalIn > 0) {
         console.log({ nextEvalIn });
