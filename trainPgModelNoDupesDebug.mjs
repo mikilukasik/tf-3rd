@@ -39,19 +39,18 @@ let testData;
 let alreadySetTrainable = false;
 
 const loadTestData = async () => {
-  const { getNextBatch } = await datasetReaderV3({
-    folder: path.resolve(datasetFolder),
-    test: true,
-    batchSize: testRecordsPerDataset,
-    filter,
-    //noDupes: true,
-    dupeCacheSize: 100000,
-  });
-
-  console.log('datasetReaderV3 for test samples initialized, getting test samples...');
-  const rawTestData = await getNextBatch();
-  console.log(`Loaded ${rawTestData.length} test samples.`);
-  testData = loadData(rawTestData.map(transformRecord).filter(Boolean));
+  // const { getNextBatch } = await datasetReaderV3({
+  //   folder: path.resolve(datasetFolder),
+  //   test: true,
+  //   batchSize: testRecordsPerDataset,
+  //   filter,
+  //   //noDupes: true,
+  //   dupeCacheSize: 100000,
+  // });
+  // console.log('datasetReaderV3 for test samples initialized, getting test samples...');
+  // const rawTestData = await getNextBatch();
+  // console.log(`Loaded ${rawTestData.length} test samples.`);
+  // testData = loadData(rawTestData.map(transformRecord).filter(Boolean));
 };
 
 const loadModel = async ({ folder }) => {
@@ -133,7 +132,7 @@ const trainModel = async function ({ model, trainData }) {
 
 // verify the model against the test data
 const evaluateModel = async function ({ model, tempFolder }) {
-  console.log('skipping eval');
+  // console.log('skipping eval');
 
   return { loss: 1, categoricalCrossentropy: 1 };
 
@@ -168,18 +167,15 @@ const evaluateModel = async function ({ model, tempFolder }) {
 let getNextDatasets;
 
 const saveModel = async ({ model, modelDirName }) => {
-  console.log('skipping save');
+  // console.log('skipping save');
   // console.log('\n--------------------------------');
   // console.log('Saving model...', { modelDirName });
-
   // await model.save(`file://${modelDirName}`);
-
   // await Promise.all(
   //   Object.keys(filesToCopy).map((targetFileName) =>
   //     fs.copyFile(path.resolve(filesToCopy[targetFileName]), path.resolve(modelDirName, targetFileName)),
   //   ),
   // );
-
   // console.log('done');
   // console.log('--------------------------------\n');
 };
@@ -196,7 +192,7 @@ const runIteration = async ({ model, iterationIndex }) => {
 
   // const trainData = loadData(rawTrainData.map(transformRecord).filter(Boolean));
 
-  console.log('skipping training');
+  // console.log('skipping training');
   // await trainModel({
   //   model,
   //   trainData,
@@ -226,13 +222,13 @@ const run = async function () {
       await runIteration({ model });
 
       if (nextEvalIn > 0) {
-        console.log({ nextEvalIn });
+        // console.log({ nextEvalIn });
         nextEvalIn -= 1;
         continue;
       }
 
       nextEvalIn = iterationsPerEval;
-      console.log('evaluating...');
+      // console.log('evaluating...');
 
       const { categoricalCrossentropy } = await evaluateModel({ model });
       console.log(`categoricalCrossentropy: ${categoricalCrossentropy}`);

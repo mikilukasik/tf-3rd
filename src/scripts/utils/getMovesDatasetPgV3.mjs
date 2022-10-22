@@ -14,6 +14,11 @@ const getNextFileName = async (fileName, rootFolder, deepFileName) => {
   const split = fileName.split('/');
   const depth = split.length - rootFolder.split('/').length;
 
+  if (depth === 0) {
+    console.log(`finished reading dataset at file ${deepFileName}`);
+    return fileName;
+  }
+
   const folderName = split.slice(0, -1).join('/');
   const dirContents = (await fs.readdir(folderName)).sort();
   const currentIndex = dirContents.findIndex((file) => file === split[split.length - 1]);
@@ -25,16 +30,10 @@ const getNextFileName = async (fileName, rootFolder, deepFileName) => {
       .join('/');
   }
 
-  if (depth > 0) {
-    const nextFolder = await getNextFileName(folderName, rootFolder, deepFileName || fileName, false);
-    const firstFileNameInNextFolder = path.resolve(nextFolder, (await fs.readdir(nextFolder)).sort()[0]);
+  const nextFolder = await getNextFileName(folderName, rootFolder, deepFileName || fileName, false);
+  const firstFileNameInNextFolder = path.resolve(nextFolder, (await fs.readdir(nextFolder)).sort()[0]);
 
-    return firstFileNameInNextFolder;
-  }
-
-  // read all in category, start from beginning
-  console.log(`finished reading dataset at file ${deepFileName}`);
-  return fileName;
+  return firstFileNameInNextFolder;
 };
 
 const readMore = async ({ takeMax, pointers, pointerKey, folder }) => {
