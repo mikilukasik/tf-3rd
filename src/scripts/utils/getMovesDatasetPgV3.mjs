@@ -2,23 +2,15 @@ import * as path from 'path';
 import { promises as fs } from 'fs';
 
 import { getRandomFileFromDir } from './getRandomFileFromDir.mjs';
-import { getGroups } from './groups.mjs';
-import getFolderSize from 'get-folder-size';
 import { shuffle } from '../../../chss-module-engine/src/utils/schuffle.js';
-import { getFirstFileFromDir } from './getFirstFileFromDir.mjs';
-import { all } from '@tensorflow/tfjs-core';
 
-// const GROUP_SIZE_CUTOFF = 30000000;
-
-const getNextFileName = async (fileName, rootFolder, deepFileName) => {
-  const split = fileName.split('/');
-  const depth = split.length - rootFolder.split('/').length;
-
-  if (depth === 0) {
+const getNextFileName = async (fileName, rootFolder, deepFileName, subCall = false) => {
+  if (fileName === rootFolder) {
     console.log(`finished reading dataset at file ${deepFileName}`);
     return fileName;
   }
 
+  const split = fileName.split('/');
   const folderName = split.slice(0, -1).join('/');
   const dirContents = (await fs.readdir(folderName)).sort();
   const currentIndex = dirContents.findIndex((file) => file === split[split.length - 1]);
@@ -30,16 +22,15 @@ const getNextFileName = async (fileName, rootFolder, deepFileName) => {
       .join('/');
   }
 
-  const nextFolder = await getNextFileName(folderName, rootFolder, deepFileName || fileName, false);
+  const nextFolder = await getNextFileName(folderName, rootFolder, deepFileName || fileName, true);
   const firstFileNameInNextFolder = path.resolve(nextFolder, (await fs.readdir(nextFolder)).sort()[0]);
+
+  if (!subCall) console.log(`reading from folder: ${nextFolder}`);
 
   return firstFileNameInNextFolder;
 };
 
 const readMore = async ({ takeMax, pointers, pointerKey, folder }) => {
-  // console.log({ pointers, pointerKey, folder }, 66);
-  // process.exit(0);
-
   const rawData = await fs.readFile(pointers[pointerKey].fileName, 'utf-8');
   const parsedData = rawData
     .trim()
