@@ -5,7 +5,7 @@ const path = require('path');
 const creatorFilename = 'createModelPg1.js';
 
 const versionName = 'v1';
-const modelName = 'pg1_small';
+const modelName = 'pg1_medium';
 
 const modelDirName = `models/${modelName}_${versionName}`;
 const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
@@ -65,19 +65,19 @@ const outputLayer = ({ input }) =>
 const buildModel = function () {
   const input = tf.input({ shape: [8, 8, inputLength], name: `${versionName}__input` });
 
-  const conv3a = convBlock({ input, kernelSize: 3, filters: 13 });
-  const conv3b = convBlock({ input: conv3a, kernelSize: 3, filters: 32 });
+  const conv3a = convBlock({ input, kernelSize: 3, filters: 16 });
+  const conv3b = convBlock({ input: conv3a, kernelSize: 3, filters: 64 });
 
-  const conv8a = convBlock({ input, kernelSize: 8, filters: 13 });
-  const conv8b = convBlock({ input: conv8a, kernelSize: 8, filters: 32 });
+  const conv8a = convBlock({ input, kernelSize: 8, filters: 16 });
+  const conv8b = convBlock({ input: conv8a, kernelSize: 8, filters: 64 });
 
   const flat3 = flattenLayer({ input: conv3b });
   const flat8 = flattenLayer({ input: conv8b });
 
   const concatenated = concatLayer([flat3, flat8]);
 
-  const dense1 = denseLayer({ input: concatenated, units: 1024 });
-  const dense2 = denseLayer({ input: dense1, units: 512 });
+  const dense1 = denseLayer({ input: concatenated, units: outUnits });
+  const dense2 = denseLayer({ input: dense1, units: 1024 });
 
   const output = outputLayer({ input: dense2 });
 
@@ -90,7 +90,7 @@ const saveModel = async ({ model }) => {
   await fs.mkdir(folder, { recursive: true });
 
   await model.save(`file://${folder}`);
-  await fs.copyFile(path.resolve(creatorFilename), path.resolve(folder, creatorFilename));
+  await fs.copyFile(path.resolve(creatorFilename), path.resolve(folder, 'createModel.js'));
 };
 
 const run = async function () {

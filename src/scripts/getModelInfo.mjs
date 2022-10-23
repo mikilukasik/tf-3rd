@@ -1,7 +1,7 @@
 import * as tf from '@tensorflow/tfjs-node';
 import * as path from 'path';
 
-const sourceModelDirName = 'models/rnd_nodupe_v2_final';
+const sourceModelDirName = 'models/pg1_small_v1z_0.00000390625/2.16854405-1666359554325';
 
 const loadModel = async ({ folder }) => {
   const model = await tf.loadLayersModel(`file://${folder}/model.json`);
