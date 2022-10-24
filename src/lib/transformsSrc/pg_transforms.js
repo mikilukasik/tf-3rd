@@ -1,4 +1,6 @@
-({ tf }) => {
+// exportsInfo.setUsedInUnknownWay();
+
+export default ({ tf }) => {
   console.log('initialising pg model transforms.');
 
   const pieces = ['', 'p', 'b', 'n', 'r', 'q', 'k', '', '', 'P', 'B', 'N', 'R', 'Q', 'K'];
