@@ -9,11 +9,20 @@ import { getXs } from './transform.js';
 const inUnits = 14;
 const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
 
-const initialSourceModelDirName = 'models/pg1_sml_v4';
-const targetModelName = 'models/pg1_sml_v4xx';
+const initialSourceModelDirName = 'models/pg1_small__lessbias_v2_0.001/2.50273156-1668775519401';
+const targetModelName = 'models/pg1_small__lessbias_v2x';
+
+const initialLearningRate = 0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
+const finalLearningRate = 0.000001;
+const makeTrainableBelowLr = 0.0001; //0.00005;
+
+let learningRate = initialLearningRate;
 
 // all
-const filter = (data) => Number(data[2]) >= 0 || Number(data[3]) > 0.001 || Math.random() < 0.01; //mostly good moves;
+const filter = (data) =>
+  Number(data[2]) >= 0 ||
+  // Number(data[3]) > 0.001 ||
+  Math.random() < learningRate * 5; //mostly good moves;
 
 // midegame
 // const filter = (data) => data[7] === '1' && (Number(data[2]) >= 0 || Number(data[3]) > 0.0001); //|| Math.random() < 0.01;
@@ -25,7 +34,7 @@ const filesToCopy = {
   // 'createModelPg1Tiny.js': path.resolve(initialSourceModelDirName, 'createModelPg1Tiny.js'),
   // 'createModel.js': path.resolve(initialSourceModelDirName, 'createModel.js'),
   // 'createModelPg1.js': path.resolve(initialSourceModelDirName, 'createModelPg1.js'),
-  'train.mjs': './trainPgModelNoDupes.mjs', // todo: read only once at the beginning, in case file changes during training
+  'train.mjs': './trainLessBias.mjs', // todo: read only once at the beginning, in case file changes during training
   // 'transforms.js': 'src/lib/bundledTransforms/pg_transforms.js',
 };
 
@@ -35,10 +44,8 @@ const batchSize = 5000;
 const maxIterationsWithoutImprovement = 2;
 const iterationsPerEval = 10;
 const dupeCacheSize = 2000000;
-
-const initialLearningRate = 0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
-const finalLearningRate = 0.000001;
-const makeTrainableBelowLr = 0.0001; //0.00005;
+// const dupeCacheSize = 1000000;
+const singleMoveRatio = 3;
 
 let testData;
 let alreadySetTrainable = false;
@@ -48,9 +55,9 @@ const loadTestData = async () => {
     // folder: path.resolve(datasetFolder),
     test: true,
     batchSize: testRecordsPerDataset,
-    filter,
-    //noDupes: true,
-    dupeCacheSize: 200000,
+    filter: (data) => Number(data[2]) >= 0,
+    dupeCacheSize: 100000,
+    singleMoveRatio,
   });
 
   console.log('datasetReaderV3 for test samples initialized, getting test samples...');
@@ -209,7 +216,6 @@ const runIteration = async ({ model, iterationIndex }) => {
 let currentBest;
 
 const run = async function () {
-  let learningRate = initialLearningRate;
   let sourceModelDirName = initialSourceModelDirName;
   const previousBestFolders = [];
 
@@ -297,6 +303,7 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
           filter,
           //noDupes: true, //per batch
           dupeCacheSize,
+          singleMoveRatio,
         });
         console.log('datasetReaderV3 for lessons initialized');
         return async ({ iterationIndex } = {}) => {

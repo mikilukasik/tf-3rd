@@ -4,53 +4,48 @@ import path from 'path';
 import { datasetReaderV3 } from './src/scripts/utils/getMovesDatasetPgV3.mjs';
 import { getXs } from './transform.js';
 
-// const datasetFolder = './data/newestCsvs/newest2'; //  /newest and /newest2
+const datasetFolder = './data/newestCsvs/newest2'; //  /newest and /newest2
 
-const inUnits = 14;
-const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
+// const initialSourceModelDirName = 'models/pg1_small_v1x_0.000015625/2.17783642-1666323282932';
+const initialSourceModelDirName = 'models/OME_small_v1';
+const targetModelName = 'models/OME_small_v1';
 
-const initialSourceModelDirName = 'models/pg1_sml_v4';
-const targetModelName = 'models/pg1_sml_v4xx';
-
-// all
-const filter = (data) => Number(data[2]) >= 0 || Number(data[3]) > 0.001 || Math.random() < 0.01; //mostly good moves;
-
-// midegame
-// const filter = (data) => data[7] === '1' && (Number(data[2]) >= 0 || Number(data[3]) > 0.0001); //|| Math.random() < 0.01;
-
-//openings
-// const filter = (data) => Number(data[2]) >= 0 && data[7] === '0'; //|| Math.random() < 0.01;
+// [wr, wf, i, p, o2, lmf, lmt, wm ? movesToOneHot[wm[0]][wm[1]] : '-', s]
+const filter = (data) => data[5] === 'true'; //|| Math.random() < 0.01;
 
 const filesToCopy = {
   // 'createModelPg1Tiny.js': path.resolve(initialSourceModelDirName, 'createModelPg1Tiny.js'),
   // 'createModel.js': path.resolve(initialSourceModelDirName, 'createModel.js'),
   // 'createModelPg1.js': path.resolve(initialSourceModelDirName, 'createModelPg1.js'),
-  'train.mjs': './trainPgModelNoDupes.mjs', // todo: read only once at the beginning, in case file changes during training
-  // 'transforms.js': 'src/lib/bundledTransforms/pg_transforms.js',
+  // 'train.mjs': './trainPgModelNoDupes.mjs', // todo: read only once at the beginning, in case file changes during training
+  // 'loader.js': 'src/lib/bundledTransforms/pg_transforms.js',
 };
 
 const recordsPerDataset = 30000;
 const testRecordsPerDataset = 20000;
 const batchSize = 5000;
-const maxIterationsWithoutImprovement = 2;
-const iterationsPerEval = 10;
+const maxIterationsWithoutImprovement = 5;
+const iterationsPerEval = 7;
 const dupeCacheSize = 2000000;
 
-const initialLearningRate = 0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
-const finalLearningRate = 0.000001;
-const makeTrainableBelowLr = 0.0001; //0.00005;
+const initialLearningRate = 0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
+const finalLearningRate = 0.000002;
+const makeTrainableBelowLr = 0; //0.00003; //0.00005;
+
+const inUnits = 14;
+const outUnits = 3; //  opening/midgame/endgame
 
 let testData;
 let alreadySetTrainable = false;
 
 const loadTestData = async () => {
   const { getNextBatch } = await datasetReaderV3({
-    // folder: path.resolve(datasetFolder),
+    folder: path.resolve(datasetFolder),
     test: true,
     batchSize: testRecordsPerDataset,
     filter,
     //noDupes: true,
-    dupeCacheSize: 200000,
+    dupeCacheSize: 100000,
   });
 
   console.log('datasetReaderV3 for test samples initialized, getting test samples...');
@@ -64,6 +59,12 @@ const loadModel = async ({ folder }) => {
 
   return model;
 };
+
+const OMEMap = [
+  [1, 0, 0],
+  [0, 1, 0],
+  [0, 0, 1],
+];
 
 const transformRecord = (record) => {
   const [
@@ -80,9 +81,7 @@ const transformRecord = (record) => {
     lmt, //.map((val) => val.toString(16).padStart(2, '0')).join(''),
   ] = record;
 
-  const ys = new Array(outUnits).fill(0);
-  ys[Number(onehot_move)] = 1;
-
+  const ys = OMEMap[Number(p)];
   const xs = getXs({ fens: [fen], lmf, lmt });
 
   return { xs, ys };
@@ -132,7 +131,6 @@ const trainModel = async function ({ model, trainData }) {
 
   // console.log(`Tensors in memory before training: ${tf.memory().numTensors}`);
   const result = await model.fitDataset(trainData, options);
-  console.log(`Tensors in memory after training: ${tf.memory().numTensors}`);
   return result;
 };
 
@@ -222,13 +220,15 @@ const run = async function () {
     let iterationsWithNoImprovement = 0;
     let nextEvalIn = 0;
     do {
-      await await runIteration({ model });
+      await runIteration({ model });
 
       if (nextEvalIn > 0) {
-        console.log({ nextEvalIn, currentBest, iterationsWithNoImprovement });
+        console.log({ nextEvalIn, currentBest });
         nextEvalIn -= 1;
         continue;
       }
+
+      console.log(`Tensors in memory after training: ${tf.memory().numTensors}`);
 
       nextEvalIn = iterationsPerEval;
       console.log('evaluating...');
@@ -291,7 +291,7 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
     if (!alreadyInited)
       getNextDatasets = await (async () => {
         const { getNextBatch } = await datasetReaderV3({
-          // folder: path.resolve(datasetFolder),
+          folder: path.resolve(datasetFolder),
           test: false,
           batchSize: recordsPerDataset,
           filter,
@@ -310,9 +310,8 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
     const sourceModelFolder = path.resolve(sourceModelDirName);
     const model = await loadModel({ folder: sourceModelFolder, learningRate });
 
-    if (makeTrainableBelowLr && learningRate <= makeTrainableBelowLr) {
-      if (!alreadySetTrainable)
-        console.log(`learningRate fell below ${makeTrainableBelowLr}, making all layers trainable...`);
+    if (!alreadySetTrainable && makeTrainableBelowLr && learningRate <= makeTrainableBelowLr) {
+      console.log(`learningRate fell below ${makeTrainableBelowLr}, making all layers trainable...`);
       model.layers.forEach((l) => (l.trainable = true));
       alreadySetTrainable = true;
     }

@@ -1,7 +1,7 @@
 import * as path from 'path';
 import { promises as fs } from 'fs';
 
-export const getRandomFileFromDir = async (dir) => {
+export const getRandomFileFromDir = async (dir, firstFile) => {
   // this assumes that a dir has either files or subdirs in it, not both
 
   const list = await fs.readdir(dir);
@@ -22,9 +22,9 @@ export const getRandomFileFromDir = async (dir) => {
     if (file.endsWith('.csv')) files.push(path.resolve(dir, file));
   }
 
-  if (files.length) return files[Math.floor(Math.random() * files.length)];
+  if (files.length) return firstFile ? files.sort()[0] : files[Math.floor(Math.random() * files.length)];
 
-  const chosenDir = dirs[Math.floor(Math.random() * dirs.length)];
+  const chosenDir = firstFile ? dirs.sort()[0] : dirs[Math.floor(Math.random() * dirs.length)];
 
-  return getRandomFileFromDir(chosenDir);
+  return getRandomFileFromDir(chosenDir, firstFile);
 };

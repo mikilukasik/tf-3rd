@@ -2,10 +2,10 @@ const tf = require('@tensorflow/tfjs-node');
 const fs = require('fs').promises;
 const path = require('path');
 
-const creatorFilename = 'createModelPg1Large.js';
+const creatorFilename = 'createOpeningsModel.js';
 
-const versionName = 'v3';
-const modelName = 'pg1_large';
+const versionName = 'v1';
+const modelName = 'openings_small';
 
 const modelDirName = `models/${modelName}_${versionName}`;
 const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
@@ -52,32 +52,32 @@ const concatLayer = (inputs) =>
     })
     .apply(inputs);
 
-const outputLayer = ({ input }) =>
+const outputLayer = ({ input, activation = 'softmax' }) =>
   tf.layers
     .dense({
       units: outUnits,
       useBias: false,
-      activation: 'softmax',
-      name: `${versionName}__softmax_output-${Math.random().toString().slice(2)}`,
+      activation,
+      name: `${versionName}__${activation}_output-${Math.random().toString().slice(2)}`,
     })
     .apply(input);
 
 const buildModel = function () {
   const input = tf.input({ shape: [8, 8, inputLength], name: `${versionName}__input` });
 
-  const conv3a = convBlock({ input, kernelSize: 3, filters: 64 });
-  const conv3b = convBlock({ input: conv3a, kernelSize: 3, filters: 128 });
+  const conv3a = convBlock({ input, kernelSize: 3, filters: 16 });
+  const conv3b = convBlock({ input: conv3a, kernelSize: 3, filters: 64 });
 
-  const conv8a = convBlock({ input, kernelSize: 8, filters: 64 });
-  const conv8b = convBlock({ input: conv8a, kernelSize: 8, filters: 128 });
+  const conv8a = convBlock({ input, kernelSize: 8, filters: 16 });
+  const conv8b = convBlock({ input: conv8a, kernelSize: 8, filters: 64 });
 
   const flat3 = flattenLayer({ input: conv3b });
   const flat8 = flattenLayer({ input: conv8b });
 
   const concatenated = concatLayer([flat3, flat8]);
 
-  const dense1 = denseLayer({ input: concatenated, units: 5000 });
-  const dense2 = denseLayer({ input: dense1, units: 3000 });
+  const dense1 = denseLayer({ input: concatenated, units: 256 });
+  const dense2 = denseLayer({ input: dense1, units: 128 });
 
   const output = outputLayer({ input: dense2 });
 

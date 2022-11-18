@@ -1,3 +1,4 @@
+import { board2fen } from '../../../chss-module-engine/src/engine_new/transformers/board2fen.js';
 import { oneHotToMovesV2 } from '../../scripts/utils/oneHotMovesMapV2.mjs';
 
 export default async ({ tf, modelUrl }) => {
@@ -37,8 +38,7 @@ export default async ({ tf, modelUrl }) => {
 
   const cellIndex2cellStr = (index) => `${String.fromCharCode((index % 8) + 97)}${8 - Math.floor(index / 8)}`;
 
-  const getLmVal = (allValsString, index) =>
-    1 / (Number(`0x${allValsString[index * 2]}${allValsString[index * 2 + 1]}`) || 0.5);
+  const getLmVal = (allValsArr, index) => 1 / allValsArr[index];
 
   const getXs = ({ fens, lmt, lmf }) => {
     const expandedFens = fens.map((fen) => {
@@ -152,20 +152,27 @@ export default async ({ tf, modelUrl }) => {
     return `${invertedBoard} ${nextChar === 'w' ? 'b' : 'w'} ${invertedCastling} ${mirroredEnPassant}`;
   };
 
-  const gameToXs = ({ game: { allPastFens, wNext, moves } }) => {
-    // console.log({ wNext });
+  const gameToXs = ({ game: { board, allPastFens, wNext, moves, lmf, lmt } }) => {
+    // console.log({ board, allPastFens, wNext, moves, lmf, lmt });
 
     // console.log({ game });
-    const allPastFensLength = allPastFens.length;
-    const fens = [
-      // allPastFens[allPastFensLength - 5],
-      // allPastFens[allPastFensLength - 3],
-      allPastFens[allPastFensLength - 1],
-    ];
+    const allPastFensLength = allPastFens && allPastFens.length;
+    const fens = allPastFensLength
+      ? [
+          // allPastFens[allPastFensLength - 5],
+          // allPastFens[allPastFensLength - 3],
+          allPastFens[allPastFensLength - 1],
+        ]
+      : [board2fen(board)];
+
     if (!wNext)
       fens.forEach((f, i) => {
         if (fens[i]) fens[i] = mirrorer(f);
       });
+
+    if (lmf && lmt) {
+      return getXs({ fens, lmf, lmt });
+    }
 
     // `${cellIndex2cellStr(move >>> 10)}${cellIndex2cellStr(move & 63)}${getPromotionPiece(move)}`;
 
@@ -180,7 +187,7 @@ export default async ({ tf, modelUrl }) => {
       return 255;
     });
     // console.log({ lastMovedFromInts });
-    const lastMovedFrom = lastMovedFromInts.map((val) => val.toString(16).padStart(2, '0'));
+    // const lastMovedFrom = lastMovedFromInts.map((val) => val.toString(16).padStart(2, '0'));
 
     const lastMovedToInts = new Array(64).fill(255).map((val, cellIndex) => {
       let lookBackIndex = i;
@@ -193,12 +200,16 @@ export default async ({ tf, modelUrl }) => {
     });
     // console.log({ lastMovedToInts });
 
-    const lastMovedTo = lastMovedToInts.map((val) => val.toString(16).padStart(2, '0'));
+    // const lastMovedTo = lastMovedToInts.map((val) => val.toString(16).padStart(2, '0'));
 
-    const lmf = (!wNext ? mirrorFlatArray : (e) => e)(lastMovedFrom).join('');
-    const lmt = (!wNext ? mirrorFlatArray : (e) => e)(lastMovedTo).join('');
+    // const lmf = (!wNext ? mirrorFlatArray : (e) => e)(lastMovedFrom).join('');
+    // const lmt = (!wNext ? mirrorFlatArray : (e) => e)(lastMovedTo).join('');
 
-    return getXs({ fens, lmf, lmt });
+    return getXs({
+      fens,
+      lmf: (!wNext ? mirrorFlatArray : (e) => e)(lastMovedFromInts), //.join(''),
+      lmt: (!wNext ? mirrorFlatArray : (e) => e)(lastMovedToInts), //.join(''),
+    });
 
     // return [0, 0];
   };
