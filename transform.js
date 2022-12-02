@@ -106,10 +106,6 @@ const getXs = ({ fens, lmt, lmf }) => {
     return arr;
   });
 
-  // if (!lmt || !lmf) {
-  //   console.log({ lmt, lmf, fens });
-  // }
-
   return new Array(64)
     .fill(0)
     .map((dummy, index) => [

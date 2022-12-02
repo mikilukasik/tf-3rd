@@ -8,8 +8,9 @@ import { getXs } from './transform.js';
 const datasetFolder = './data/newestCsvs/newest2'; //  /newest and /newest2
 
 const sourceModelDirNames = [
-  'models/pg1_small_v1_0.001/2.40049481-1666223914108',
-  'models/pg1_small__lessbias_v1_0.000125/1.98296010-1668763868855',
+  // 'models/pg1_small_v1_0.001/2.23474717-1668924341173',
+  'models/small_p1_48_m7_5_b1_v1_0.000001953125/2.19584179-1669013788217',
+  'models/pg1_small_v1z_0.00000390625/2.16854405-1666359554325',
 ];
 
 const filter = (data) => Number(data[2]) >= 0;
@@ -23,12 +24,14 @@ const batchSize = 5000;
 const loadTestData = async () => {
   const { getNextBatch } = await datasetReaderV3({
     folder: path.resolve(datasetFolder),
-    test: true,
+    test: false,
     batchSize: testRecordsPerDataset,
     filter,
     //noDupes: true,
-    dupeCacheSize: 200000,
-    singleMoveRatio: 3,
+    dupeCacheSize: 2000000,
+    singleMoveRatio: 7.5,
+    singleBalanceGroupRatio: 1,
+    singleProgressGroupRatio: 1.48,
   });
 
   console.log('datasetReaderV3 for test samples initialized, getting test samples...');

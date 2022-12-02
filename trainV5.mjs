@@ -1,28 +1,34 @@
 import tf from '@tensorflow/tfjs-node';
-import { promises as fs } from 'fs';
+import { promises as fs, readFileSync } from 'fs';
 import path from 'path';
-import { datasetReaderV3 } from './src/scripts/utils/getMovesDatasetPgV3.mjs';
+import { datasetReaderV5 } from './src/scripts/utils/getMovesDatasetPgV5.mjs';
 import { getXs } from './transform.js';
 
-// const datasetFolder = './data/newestCsvs/newest2'; //  /newest and /newest2
+const initialSourceModelDirName = 'models/pg1_small_v1';
+const targetModelName = 'models/small_tV5_mUpUbUd100k';
+
+const singleMoveRatio = undefined; // 7.5;
+const singleProgressGroupRatio = undefined; // 1.48;
+const singleBalanceGroupRatio = undefined; // 1;
+
+const initialLearningRate = 0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
+const finalLearningRate = 0.0000001;
+const makeTrainableBelowLr = 0; // 0.0001; //0.00005;
+
+const recordsPerDataset = 30000;
+const testRecordsPerDataset = 20000;
+const batchSize = 5000;
+const maxIterationsWithoutImprovement = 10;
+const iterationsPerEval = 10;
+const dupeCacheSize = 100000;
 
 const inUnits = 14;
 const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
 
-const initialSourceModelDirName = 'models/pg1_small__lessbias_v2_0.001/2.50273156-1668775519401';
-const targetModelName = 'models/pg1_small__lessbias_v2x';
-
-const initialLearningRate = 0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
-const finalLearningRate = 0.000001;
-const makeTrainableBelowLr = 0.0001; //0.00005;
-
-let learningRate = initialLearningRate;
-
 // all
-const filter = (data) =>
-  Number(data[2]) >= 0 ||
-  // Number(data[3]) > 0.001 ||
-  Math.random() < learningRate * 5; //mostly good moves;
+const filter = (data) => Number(data[2]) >= 0; //|| data[4] === '1'; //||
+// some other moves too
+// Math.random() < 0.005;
 
 // midegame
 // const filter = (data) => data[7] === '1' && (Number(data[2]) >= 0 || Number(data[3]) > 0.0001); //|| Math.random() < 0.01;
@@ -30,36 +36,35 @@ const filter = (data) =>
 //openings
 // const filter = (data) => Number(data[2]) >= 0 && data[7] === '0'; //|| Math.random() < 0.01;
 
-const filesToCopy = {
-  // 'createModelPg1Tiny.js': path.resolve(initialSourceModelDirName, 'createModelPg1Tiny.js'),
-  // 'createModel.js': path.resolve(initialSourceModelDirName, 'createModel.js'),
-  // 'createModelPg1.js': path.resolve(initialSourceModelDirName, 'createModelPg1.js'),
-  'train.mjs': './trainLessBias.mjs', // todo: read only once at the beginning, in case file changes during training
-  // 'transforms.js': 'src/lib/bundledTransforms/pg_transforms.js',
+const fileNamesToCopy = {
+  'train.mjs': './trainV5.mjs',
+  'loader.js': './dist/pg_loader.js',
+  'datasetReader.mjs': './src/scripts/utils/getMovesDatasetPgV5.mjs',
+  'transforms.js': './transform.js',
 };
 
-const recordsPerDataset = 30000;
-const testRecordsPerDataset = 20000;
-const batchSize = 5000;
-const maxIterationsWithoutImprovement = 2;
-const iterationsPerEval = 10;
-const dupeCacheSize = 2000000;
-const singleMoveRatio = 3;
+const filesToCopy = Object.keys(fileNamesToCopy).reduce((p, c) => {
+  p[c] = readFileSync(path.resolve(fileNamesToCopy[c]), 'utf-8');
+  return p;
+}, {});
 
+let learningRate = initialLearningRate;
 let testData;
 let alreadySetTrainable = false;
 
 const loadTestData = async () => {
-  const { getNextBatch } = await datasetReaderV3({
-    // folder: path.resolve(datasetFolder),
+  const { getNextBatch } = await datasetReaderV5({
     test: true,
     batchSize: testRecordsPerDataset,
-    filter: (data) => Number(data[2]) >= 0,
-    dupeCacheSize: 100000,
+    filter,
+    // filter: (data) => Number(data[2]) >= 0,
+    dupeCacheSize,
     singleMoveRatio,
+    singleProgressGroupRatio,
+    singleBalanceGroupRatio,
   });
 
-  console.log('datasetReaderV3 for test samples initialized, getting test samples...');
+  console.log('datasetReaderV5 for test samples initialized, getting test samples...');
   const rawTestData = await getNextBatch();
   console.log(`Loaded ${rawTestData.length} test samples.`);
   testData = loadData(rawTestData.map(transformRecord).filter(Boolean));
@@ -182,7 +187,7 @@ const saveModel = async ({ model, modelDirName }) => {
 
   await Promise.all(
     Object.keys(filesToCopy).map((targetFileName) =>
-      fs.copyFile(path.resolve(filesToCopy[targetFileName]), path.resolve(modelDirName, targetFileName)),
+      fs.writeFile(path.resolve(modelDirName, targetFileName), filesToCopy[targetFileName], 'utf-8'),
     ),
   );
 
@@ -295,7 +300,7 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
   try {
     if (!alreadyInited)
       getNextDatasets = await (async () => {
-        const { getNextBatch } = await datasetReaderV3({
+        const { getNextBatch } = await datasetReaderV5({
           // folder: path.resolve(datasetFolder),
           test: false,
           batchSize: recordsPerDataset,
@@ -303,8 +308,10 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
           //noDupes: true, //per batch
           dupeCacheSize,
           singleMoveRatio,
+          singleProgressGroupRatio,
+          singleBalanceGroupRatio,
         });
-        console.log('datasetReaderV3 for lessons initialized');
+        console.log('datasetReaderV5 for lessons initialized');
         return async ({ iterationIndex } = {}) => {
           // console.log({ iterationIndex });
           const records = await getNextBatch();
@@ -334,7 +341,7 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
 
     await Promise.all(
       Object.keys(filesToCopy).map((targetFileName) =>
-        fs.copyFile(path.resolve(filesToCopy[targetFileName]), path.resolve(modelDirName, targetFileName)),
+        fs.writeFile(path.resolve(modelDirName, targetFileName), filesToCopy[targetFileName], 'utf-8'),
       ),
     );
 

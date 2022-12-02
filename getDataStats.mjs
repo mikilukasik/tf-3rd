@@ -21,7 +21,7 @@ const datasetFolder = './data/newestCsvs/newest2'; //  /newest and /newest2
 // const filter = () => true;
 
 // all
-const filter = (data) => Number(data[2]) >= 0 || Number(data[3]) > 0.001 || Math.random() < 0.01; //mostly good moves;
+const filter = (data) => Number(data[2]) >= 0; //|| Number(data[3]) > 0.001 || Math.random() < 0.01; //mostly good moves;
 
 // midegame
 // const filter = (data) => data[7] === '1' && (Number(data[2]) >= 0 || Number(data[3]) > 0.0001); //|| Math.random() < 0.01;
@@ -30,10 +30,23 @@ const filter = (data) => Number(data[2]) >= 0 || Number(data[3]) > 0.001 || Math
 // const filter = (data) => Number(data[2]) >= 0 && data[7] === '0'; //|| Math.random() < 0.01;
 
 const recordsPerDataset = 30000;
-const dupeCacheSize = 1000000;
-const singleMoveRatio = 1.8;
+const dupeCacheSize = 2000000;
+const singleMoveRatio = 7.5;
+const singleProgressGroupRatio = 1.48;
+const singleBalanceGroupRatio = 1;
 
-const stats = new Array(1837).fill(0);
+const stats = new Array(3).fill(0);
+
+const getBalanceGroupFromFen = (fen) => {
+  const [pieces] = fen.split(' ');
+
+  const whitePieceCount = pieces.replace(/[^A-Z]/g, '').length;
+  const blackPieceCount = pieces.replace(/[^a-z]/g, '').length;
+
+  if (blackPieceCount > whitePieceCount) return 0;
+  if (blackPieceCount < whitePieceCount) return 1;
+  return 2;
+};
 
 const updateStats = async (records) => {
   for (const record of records) {
@@ -51,25 +64,14 @@ const updateStats = async (records) => {
       lmt, //.map((val) => val.toString(16).padStart(2, '0')).join(''),
     ] = record;
 
-    stats[onehot_move] += 1; // (stats[onehot_move]||0)+1
+    stats[getBalanceGroupFromFen(fen)] += 1; // (stats[onehot_move]||0)+1
   }
 
-  const sortedStats = stats
-    .map((count, oneHotMove) => ({ count, move: getMoveString(oneHotToMovesMap[oneHotMove]) }))
-    .sort((a, b) => b.count - a.count);
+  const sortedStats = stats.map((count, group) => ({ count, group })).sort((a, b) => b.count - a.count);
 
   await fs.writeFile('stats.json', JSON.stringify(sortedStats, null, 2), 'utf8');
 
-  console.log(
-    sortedStats[0],
-    sortedStats[250],
-    sortedStats[500],
-    sortedStats[750],
-    sortedStats[1000],
-    sortedStats[1250],
-    sortedStats[1500],
-    sortedStats[1750],
-  );
+  console.log(sortedStats);
 };
 
 const run = async function () {
@@ -100,6 +102,8 @@ const init = async () => {
       dupeCacheSize,
       beginningToEnd: true,
       singleMoveRatio, //: 1.2,
+      singleProgressGroupRatio,
+      singleBalanceGroupRatio,
     });
     console.log('datasetReaderV3 for lessons initialized');
 

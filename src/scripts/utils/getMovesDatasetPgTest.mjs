@@ -64,9 +64,42 @@ const readMore = async ({ takeMax, pointers, pointerKey, folder }) => {
   return parsedData;
 };
 
-const readFromGroup = async ({ pointers, pointerKey, take, folder, filter = () => true, isDupe }) => {
+const readFromGroup = async ({ pointers, pointerKey, take, folder, filter = () => true }) => {
   // console.log({ pointers, pointerKey, folder });
   // process.exit(0);
+
+  const dupeCache = {};
+  // let dupeSum = 0;
+  // let dupeSampleCount = 0;
+
+  // setInterval(() => {
+  //   const dupeCacheSize = dupeCaches.reduce((p, c) => p + Object.keys(c).length, 0);
+
+  //   dupeSum += dupeCacheSize;
+  //   dupeSampleCount += 1;
+
+  //   console.log({ test, dupeCacheSize, avg: Math.round(dupeSum / dupeSampleCount) });
+  // }, 17583);
+
+  // setInterval(() => {
+  //   // console.log({
+  //   //   dupeCacheSize: dupeCaches.reduce((p, c) => {
+  //   //     p += Object.keys(c).length;
+  //   //   }, 0),
+  //   // });
+
+  //   dupeCaches.unshift({});
+  //   if (dupeCaches.length > dupeCacheMinutes) dupeCaches.pop();
+  // }, 60000);
+
+  const isDupe = (key) => {
+    const seenAlready = dupeCache[key];
+
+    if (seenAlready) return true;
+
+    dupeCache[key] = true;
+    return false;
+  };
 
   const result = [];
   if (!take) return result;
@@ -126,40 +159,40 @@ export const datasetReaderV2 = async ({
 }) => {
   const pointers = Object.assign({}, _pointers);
 
-  const dupeCaches = [{}];
-  let dupeSum = 0;
-  let dupeSampleCount = 0;
+  // const dupeCaches = [{}];
+  // let dupeSum = 0;
+  // let dupeSampleCount = 0;
 
-  setInterval(() => {
-    const dupeCacheSize = dupeCaches.reduce((p, c) => p + Object.keys(c).length, 0);
+  // setInterval(() => {
+  //   const dupeCacheSize = dupeCaches.reduce((p, c) => p + Object.keys(c).length, 0);
 
-    dupeSum += dupeCacheSize;
-    dupeSampleCount += 1;
+  //   dupeSum += dupeCacheSize;
+  //   dupeSampleCount += 1;
 
-    console.log({ test, dupeCacheSize, avg: Math.round(dupeSum / dupeSampleCount) });
-  }, 17583);
+  //   console.log({ test, dupeCacheSize, avg: Math.round(dupeSum / dupeSampleCount) });
+  // }, 17583);
 
-  setInterval(() => {
-    // console.log({
-    //   dupeCacheSize: dupeCaches.reduce((p, c) => {
-    //     p += Object.keys(c).length;
-    //   }, 0),
-    // });
+  // setInterval(() => {
+  //   // console.log({
+  //   //   dupeCacheSize: dupeCaches.reduce((p, c) => {
+  //   //     p += Object.keys(c).length;
+  //   //   }, 0),
+  //   // });
 
-    dupeCaches.unshift({});
-    if (dupeCaches.length > dupeCacheMinutes) dupeCaches.pop();
-  }, 60000);
+  //   dupeCaches.unshift({});
+  //   if (dupeCaches.length > dupeCacheMinutes) dupeCaches.pop();
+  // }, 60000);
 
-  const isDupe = (key) => {
-    const seenAlready = dupeCaches.reduce((p, c) => {
-      return p || c[key];
-    }, false);
+  // const isDupe = (key) => {
+  //   const seenAlready = dupeCaches.reduce((p, c) => {
+  //     return p || c[key];
+  //   }, false);
 
-    if (seenAlready) return true;
+  //   if (seenAlready) return true;
 
-    dupeCaches[0][key] = true;
-    return false;
-  };
+  //   dupeCaches[0][key] = true;
+  //   return false;
+  // };
 
   const getNextBatch = () =>
     readFromGroup({
@@ -168,7 +201,7 @@ export const datasetReaderV2 = async ({
       take: batchSize,
       folder,
       filter,
-      isDupe,
+      // isDupe,
     });
 
   return {

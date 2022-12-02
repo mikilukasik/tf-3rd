@@ -4,7 +4,7 @@ import { promises as fs } from 'fs';
 import { getRandomFileFromDir } from './getRandomFileFromDir.mjs';
 import { shuffle } from '../../../chss-module-engine/src/utils/schuffle.js';
 
-const datasetFolder = './data/newestCsvs/newest2'; //  /newest and /newest2
+const datasetFolder = './data/newestCsvsWMoveindex/newest2'; //  /newest and /newest2
 
 const inUnits = 14;
 const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
@@ -83,6 +83,7 @@ const readFromGroup = async ({
   singleMoveRatio,
   singleProgressGroupRatio,
   singleBalanceGroupRatio,
+  dontLogDupes,
 }) => {
   const maxCountPerMove = Math.ceil((take / outUnits) * singleMoveRatio);
   const maxCountPerProgressGroup = Math.ceil((take / 3) * singleProgressGroupRatio);
@@ -91,6 +92,7 @@ const readFromGroup = async ({
   const moveCounts = {};
   const progressGroupCounts = [];
   const balanceGroupCounts = [];
+  const fensInThisBatch = {};
 
   const moveExceededRatio = singleMoveRatio ? (line) => (moveCounts[line[1]] || 0) > maxCountPerMove : () => false;
   const progressGroupExceededRatio = (line) => progressGroupCounts[line[7]] > maxCountPerProgressGroup;
@@ -139,13 +141,14 @@ const readFromGroup = async ({
       )
         return false;
 
-      if (isDupe(line[0])) {
+      if (isDupe(line[0]) || fensInThisBatch[line[0]]) {
         removedDupes += 1;
         return false;
       }
 
       // if() return false;
       registerRecordForCounts(line);
+      fensInThisBatch[line[0]] = true;
 
       return true;
     });
@@ -153,7 +156,7 @@ const readFromGroup = async ({
     result.push(...records);
   }
 
-  if (removedDupes) console.log(`Filtered out ${removedDupes} duplicate fens`);
+  if (removedDupes && !dontLogDupes) console.log(`Filtered out ${removedDupes} duplicate fens`);
 
   return result;
 };
@@ -169,14 +172,14 @@ const getBalanceGroupFromFen = (fen) => {
   return 2;
 };
 
-export const datasetReaderV3 = async ({
+export const datasetReaderV5 = async ({
   // folder,
   batchSize = 5000,
   pointers: _pointers = {},
   filter,
   test = false,
   // dupeCacheMinutes = 1,
-  dupeCacheSize = 1000000,
+  dupeCacheSize = 0,
   preReadDupeCache = true,
   beginningToEnd = false,
   singleMoveRatio = outUnits,
@@ -186,62 +189,70 @@ export const datasetReaderV3 = async ({
   const folder = path.resolve(datasetFolder);
   const pointers = Object.assign({}, _pointers);
 
-  const dupeCacheBlockSize = Math.ceil(dupeCacheSize / 100);
-  let activeDupeBlockLength = 0;
-  const dupeCacheBlocks = [{}];
+  let isDupe = () => false;
+  if (dupeCacheSize) {
+    const dupeCacheBlockSize = Math.ceil(dupeCacheSize / 100);
+    let activeDupeBlockLength = 0;
+    const dupeCacheBlocks = [{}];
 
-  const processDupeCache = () => {
-    dupeCacheBlocks.unshift({});
-    if (dupeCacheBlocks.length > 100) dupeCacheBlocks.pop();
-    activeDupeBlockLength = 0;
-  };
+    const processDupeCache = () => {
+      if (activeDupeBlockLength < dupeCacheBlockSize) return;
 
-  const shuffleDupeCache = () => {
-    const allKeys = shuffle(dupeCacheBlocks.reduce((p, c) => p.concat(Object.keys(c)), []));
-    dupeCacheBlocks.length = 0;
-    dupeCacheBlocks.push({});
-    activeDupeBlockLength = 0;
+      dupeCacheBlocks.unshift({});
+      if (dupeCacheBlocks.length > 100) dupeCacheBlocks.pop();
+      activeDupeBlockLength = 0;
+    };
 
-    allKeys.forEach((key) => {
+    const shuffleDupeCache = () => {
+      const allKeys = shuffle(dupeCacheBlocks.reduce((p, c) => p.concat(Object.keys(c)), []));
+      dupeCacheBlocks.length = 0;
+      dupeCacheBlocks.push({});
+      activeDupeBlockLength = 0;
+
+      allKeys.forEach((key) => {
+        dupeCacheBlocks[0][key] = true;
+        activeDupeBlockLength += 1;
+        processDupeCache();
+      });
+    };
+
+    isDupe = (key) => {
+      if (!dupeCacheSize) return false;
+
+      const seenAlready = dupeCacheBlocks.reduce((p, c) => {
+        return p || c[key];
+      }, false);
+
+      if (seenAlready) return true;
+
       dupeCacheBlocks[0][key] = true;
       activeDupeBlockLength += 1;
+      processDupeCache();
 
-      if (activeDupeBlockLength >= dupeCacheBlockSize) processDupeCache();
-    });
-  };
+      return false;
+    };
 
-  const isDupe = (key) => {
-    if (!dupeCacheSize) return false;
+    if (preReadDupeCache) {
+      while (dupeCacheBlocks.length < 100) {
+        await readFromGroup({
+          pointers,
+          pointerKey: test ? 'test-true' : 'test-false',
+          take: Math.ceil(dupeCacheSize / 300), //todo: should take until cache is full
+          folder,
+          filter,
+          isDupe,
+          singleMoveRatio,
+          singleProgressGroupRatio,
+          beginningToEnd,
+          singleBalanceGroupRatio,
+          dontLogDupes: true,
+        });
 
-    const seenAlready = dupeCacheBlocks.reduce((p, c) => {
-      return p || c[key];
-    }, false);
+        // console.log({ dupeCacheBlocks: dupeCacheBlocks.length });
+      }
 
-    if (seenAlready) return true;
-
-    dupeCacheBlocks[0][key] = true;
-    activeDupeBlockLength += 1;
-
-    if (activeDupeBlockLength >= dupeCacheBlockSize) processDupeCache();
-
-    return false;
-  };
-
-  if (preReadDupeCache) {
-    await readFromGroup({
-      pointers,
-      pointerKey: test ? 'test-true' : 'test-false',
-      take: Math.floor(dupeCacheSize / 2), //todo: should take until cache is full
-      folder,
-      filter,
-      isDupe,
-      singleMoveRatio,
-      singleProgressGroupRatio,
-      beginningToEnd,
-      singleBalanceGroupRatio,
-    });
-
-    shuffleDupeCache();
+      shuffleDupeCache();
+    }
   }
 
   let finished = false;
