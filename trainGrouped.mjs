@@ -1,29 +1,30 @@
 import tf from '@tensorflow/tfjs-node';
 import { promises as fs, readFileSync } from 'fs';
 import path from 'path';
-import { datasetReaderV5 } from './src/scripts/utils/getMovesDatasetPgV5.mjs';
-import { getXs } from './transform.js';
+import { getDatasetFromPg } from './src/scripts/utils/getDatasetFromPg.mjs';
+import { getXs } from './transformGrouped.js';
 
 // const initialSourceModelDirName = 'models/pg1_large_v1'; // gone :(
-const initialSourceModelDirName = 'models/large_tV5_mUpUbUd50k_v3_0.002/14.85368156-1672517348953';
-const targetModelName = 'models/large_tV5_mUpUbUd50k_v3';
+// const initialSourceModelDirName = 'models/pg2_small_v1';
+const initialSourceModelDirName = 'models/pg2_small_v1_0.0001/2.37257886-1672666800658';
+const targetModelName = 'models/pg2_small_v1x';
 
-const singleMoveRatio = undefined; // 7.5;
-const singleProgressGroupRatio = undefined; // 1.48;
-const singleBalanceGroupRatio = undefined; //1;
+// const singleMoveRatio = undefined; // 7.5;
+// const singleProgressGroupRatio = undefined; // 1.48;
+// const singleBalanceGroupRatio = undefined; //1;
 
 const initialLearningRate = 0.0001; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
 const finalLearningRate = 0.0000001;
 const makeTrainableBelowLr = 0; // 0.0001; //0.00005;
 
-const recordsPerDataset = 30000;
-const testRecordsPerDataset = 20000;
-const batchSize = 5000;
+const recordsPerDataset = 75000;
+const testSampleRatio = 0.018;
+const batchSize = 15000;
 const maxIterationsWithoutImprovement = 15; //10;
 const iterationsPerEval = 10;
-const dupeCacheSize = 50000;
+// const dupeCacheSize = 50000;
 
-const inUnits = 14;
+const inUnits = 12;
 const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
 
 // all
@@ -38,10 +39,10 @@ const filter = (data) => Number(data[2]) >= 0; //|| data[4] === '1'; //||
 // const filter = (data) => Number(data[2]) >= 0 && data[7] === '0'; //|| Math.random() < 0.01;
 
 const fileNamesToCopy = {
-  'train.mjs': './trainV5.mjs',
-  'loader.js': './dist/pg_loader.js',
-  'datasetReader.mjs': './src/scripts/utils/getMovesDatasetPgV5.mjs',
-  'transforms.js': './transform.js',
+  'train.mjs': './trainGrouped.mjs',
+  'loader.js': './dist/grouped_loader.js',
+  'datasetReader.mjs': './src/scripts/utils/getDatasetFromPg.mjs',
+  'transforms.js': './transformGrouped.js',
 };
 
 const filesToCopy = Object.keys(fileNamesToCopy).reduce((p, c) => {
@@ -54,19 +55,8 @@ let testData;
 let alreadySetTrainable = false;
 
 const loadTestData = async () => {
-  const { getNextBatch } = await datasetReaderV5({
-    test: true,
-    batchSize: testRecordsPerDataset,
-    filter,
-    // filter: (data) => Number(data[2]) >= 0,
-    dupeCacheSize,
-    singleMoveRatio,
-    singleProgressGroupRatio,
-    singleBalanceGroupRatio,
-  });
-
-  console.log('datasetReaderV5 for test samples initialized, getting test samples...');
-  const rawTestData = await getNextBatch();
+  console.log('getDatasetFromPg for test samples initialized, getting test samples...');
+  const rawTestData = await getTestData({ sample: testSampleRatio });
   console.log(`Loaded ${rawTestData.length} test samples.`);
   testData = loadData(rawTestData.map(transformRecord).filter(Boolean));
 };
@@ -78,24 +68,29 @@ const loadModel = async ({ folder }) => {
 };
 
 const transformRecord = (record) => {
-  const [
+  const {
     fen,
-    onehot_move,
-    hit_soon,
-    chkmate_soon,
-    result,
-    chkmate_ending,
-    stall_ending,
-    p, // ? 0 : is_midgame ? 1 : 2,
-    is_last,
-    lmf, //.map((val) => val.toString(16).padStart(2, '0')).join(''),
-    lmt, //.map((val) => val.toString(16).padStart(2, '0')).join(''),
-  ] = record;
+    moves,
+    // onehot_move,
+    // hit_soon,
+    // // chkmate_soon,
+    // result,
+    // chkmate_ending,
+    // stall_ending,
+    // p, // ? 0 : is_midgame ? 1 : 2,
+    // is_last,
+    // lmf, //.map((val) => val.toString(16).padStart(2, '0')).join(''),
+    // lmt, //.map((val) => val.toString(16).padStart(2, '0')).join(''),
+  } = record;
 
   const ys = new Array(outUnits).fill(0);
-  ys[Number(onehot_move)] = 1;
 
-  const xs = getXs({ fens: [fen], lmf, lmt });
+  moves.forEach(({ onehot_move, count, hit_soon, result }) => {
+    ys[Number(onehot_move)] = (result + hit_soon) / 8 + 0.75; // -1 for none, 0-1 for moves that happened
+    // ys[Number(onehot_move)] = (result / 2 + 0.5 + hit_soon) / 8 + 0.75; // -1 for none, 0-1 for moves that happened
+  });
+  const xs = getXs({ fens: [fen] });
+  // console.log(JSON.stringify({ xs, ys }));
 
   return { xs, ys };
 };
@@ -179,6 +174,7 @@ const evaluateModel = async function ({ model, tempFolder }) {
 };
 
 let getNextDatasets;
+let getTestData;
 
 const saveModel = async ({ model, modelDirName }) => {
   console.log('\n--------------------------------');
@@ -300,26 +296,29 @@ let alreadyInited = false;
 const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
   try {
     if (!alreadyInited)
-      getNextDatasets = await (async () => {
-        const { getNextBatch } = await datasetReaderV5({
+      ({ getNextDatasets, getTestData } = await (async () => {
+        const { getNextBatch, getTestData: gtd } = await getDatasetFromPg({
           // folder: path.resolve(datasetFolder),
-          test: false,
+          // test: false,
           batchSize: recordsPerDataset,
           filter,
           //noDupes: true, //per batch
-          dupeCacheSize,
-          singleMoveRatio,
-          singleProgressGroupRatio,
-          singleBalanceGroupRatio,
+          // dupeCacheSize,
+          // singleMoveRatio,
+          // singleProgressGroupRatio,
+          // singleBalanceGroupRatio,
         });
-        console.log('datasetReaderV5 for lessons initialized');
-        return async ({ iterationIndex } = {}) => {
-          // console.log({ iterationIndex });
-          const records = await getNextBatch();
-          console.log(`Loaded ${records.length} training records.`);
-          return { trainData: records };
+        console.log('getDatasetFromPg for lessons initialized');
+        return {
+          getNextDatasets: async ({ iterationIndex } = {}) => {
+            // console.log({ iterationIndex });
+            const records = await getNextBatch();
+            console.log(`Loaded ${records.length} training records.`);
+            return { trainData: records };
+          },
+          getTestData: gtd,
         };
-      })();
+      })());
 
     const sourceModelFolder = path.resolve(sourceModelDirName);
     const model = await loadModel({ folder: sourceModelFolder, learningRate });

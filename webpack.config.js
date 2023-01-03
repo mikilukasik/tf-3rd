@@ -2,6 +2,22 @@ const path = require('path');
 
 module.exports = [
   {
+    entry: './src/lib/transformsSrc/grouped_loader.js',
+    module: {},
+    resolve: {
+      extensions: ['.js'],
+    },
+    output: {
+      filename: 'grouped_loader.js',
+      path: path.resolve(__dirname, 'dist'),
+      library: {
+        name: 'loader',
+        type: 'assign',
+        export: 'default',
+      },
+    },
+  },
+  {
     entry: './src/lib/transformsSrc/pg_loader.js',
     module: {},
     resolve: {
