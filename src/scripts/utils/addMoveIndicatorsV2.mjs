@@ -66,33 +66,42 @@ const getWNextMoveIndicators = ({ fen, moveIndicators }) => {
 const cellIndex2cellStr = (index) => `${String.fromCharCode((index % 8) + 97)}${8 - Math.floor(index / 8)}`;
 
 export const addMoveIndicatorsV2 = ({ record, records, index, aborted_ending }) => {
-  if (index === records.length - 1) {
-    // check if it was a resignation
-    const moveIndicators = aborted_ending && record.wNextResult === -1 ? [0, 0, ''] : [];
+  try {
+    if (index === records.length - 1) {
+      // check if it was a resignation
+      const moveIndicators = aborted_ending && record.wNextResult === -1 ? [0, 0, ''] : [];
+      return Object.assign({}, record, {
+        orig_move_indexes: [0, 0, ''],
+        wnext_move_indexes: [0, 0, ''],
+        orig_movestr: moveIndicators.length ? 'resign' : '',
+        movestr: moveIndicators.length ? 'resign' : '',
+        onehot_move: moveIndicators.length
+          ? movesToOneHotV2[moveIndicators[0]][moveIndicators[1]][moveIndicators[2]]
+          : null,
+      });
+    }
+
+    const fen = record.orig_fen;
+    const nextFen = records[index + 1].orig_fen;
+
+    const moveIndicators = getMoveIndicators({ fen, nextFen });
+    // console.log({ fen, moveIndicators });
+    const wNextMoveIndicators = getWNextMoveIndicators({ fen, moveIndicators });
+    console.log({ fen, nextFen, moveIndicators, wNextMoveIndicators });
+
     return Object.assign({}, record, {
-      orig_move_indexes: [0, 0, ''],
-      wnext_move_indexes: [0, 0, ''],
-      orig_movestr: moveIndicators.length ? 'resign' : '',
-      movestr: moveIndicators.length ? 'resign' : '',
-      onehot_move: moveIndicators.length
-        ? movesToOneHotV2[moveIndicators[0]][moveIndicators[1]][moveIndicators[2]]
-        : null,
+      orig_move_indexes: moveIndicators,
+      wnext_move_indexes: wNextMoveIndicators,
+      orig_movestr: `${cellIndex2cellStr(moveIndicators[0])}${cellIndex2cellStr(moveIndicators[1])}${
+        moveIndicators[2]
+      }`,
+      movestr: `${cellIndex2cellStr(wNextMoveIndicators[0])}${cellIndex2cellStr(wNextMoveIndicators[1])}${
+        wNextMoveIndicators[2]
+      }`,
+      onehot_move: movesToOneHotV2[wNextMoveIndicators[0]][wNextMoveIndicators[1]][wNextMoveIndicators[2]],
     });
+  } catch (e) {
+    console.log(e);
+    throw e;
   }
-
-  const fen = record.orig_fen;
-  const nextFen = records[index + 1].orig_fen;
-
-  const moveIndicators = getMoveIndicators({ fen, nextFen });
-  const wNextMoveIndicators = getWNextMoveIndicators({ fen, moveIndicators });
-
-  return Object.assign({}, record, {
-    orig_move_indexes: moveIndicators,
-    wnext_move_indexes: wNextMoveIndicators,
-    orig_movestr: `${cellIndex2cellStr(moveIndicators[0])}${cellIndex2cellStr(moveIndicators[1])}${moveIndicators[2]}`,
-    movestr: `${cellIndex2cellStr(wNextMoveIndicators[0])}${cellIndex2cellStr(wNextMoveIndicators[1])}${
-      wNextMoveIndicators[2]
-    }`,
-    onehot_move: movesToOneHotV2[wNextMoveIndicators[0]][wNextMoveIndicators[1]][wNextMoveIndicators[2]],
-  });
 };

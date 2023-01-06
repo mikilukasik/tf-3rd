@@ -6,14 +6,14 @@ import { getXs } from './transformGrouped.js';
 
 // const initialSourceModelDirName = 'models/pg1_large_v1'; // gone :(
 // const initialSourceModelDirName = 'models/pg2_small_v1';
-const initialSourceModelDirName = 'models/pg2_small_v1_0.0001/2.37257886-1672666800658';
-const targetModelName = 'models/pg2_small_v1x';
+const initialSourceModelDirName = 'models/pg2_small_balanced1_0.002/4.19807291-1672991901188';
+const targetModelName = 'models/pg2_small_balanced1';
 
 // const singleMoveRatio = undefined; // 7.5;
 // const singleProgressGroupRatio = undefined; // 1.48;
 // const singleBalanceGroupRatio = undefined; //1;
 
-const initialLearningRate = 0.0001; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
+const initialLearningRate = 0.001; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
 const finalLearningRate = 0.0000001;
 const makeTrainableBelowLr = 0; // 0.0001; //0.00005;
 
@@ -27,16 +27,30 @@ const iterationsPerEval = 10;
 const inUnits = 12;
 const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
 
-// all
-const filter = (data) => Number(data[2]) >= 0; //|| data[4] === '1'; //||
-// some other moves too
-// Math.random() < 0.005;
+const generateProgressGroups = (divider, minimum) => {
+  const groups = {};
+  let minVal = 1 / divider;
+  let maxVal;
 
-// midegame
-// const filter = (data) => data[7] === '1' && (Number(data[2]) >= 0 || Number(data[3]) > 0.0001); //|| Math.random() < 0.01;
+  while (minVal > minimum) {
+    const groupName = `${minVal.toFixed(3)} - ${maxVal ? maxVal.toFixed(3) : '1'}}`;
+    groups[groupName] = {
+      preFilter: `progress > ${minVal}${maxVal ? ` AND progress < ${maxVal}` : ''}`,
+      take: (maxVal || 1) - minVal,
+    };
+    maxVal = minVal;
+    minVal /= divider;
+  }
 
-//openings
-// const filter = (data) => Number(data[2]) >= 0 && data[7] === '0'; //|| Math.random() < 0.01;
+  groups[`0 - ${maxVal.toFixed(3)}`] = {
+    preFilter: `progress < ${maxVal}`,
+    take: maxVal,
+  };
+
+  return groups;
+};
+
+const groups = generateProgressGroups(1.5, 0.025);
 
 const fileNamesToCopy = {
   'train.mjs': './trainGrouped.mjs',
@@ -56,7 +70,7 @@ let alreadySetTrainable = false;
 
 const loadTestData = async () => {
   console.log('getDatasetFromPg for test samples initialized, getting test samples...');
-  const rawTestData = await getTestData({ sample: testSampleRatio });
+  const rawTestData = await getTestData({ ratio: 0.66 });
   console.log(`Loaded ${rawTestData.length} test samples.`);
   testData = loadData(rawTestData.map(transformRecord).filter(Boolean));
 };
@@ -297,11 +311,12 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
   try {
     if (!alreadyInited)
       ({ getNextDatasets, getTestData } = await (async () => {
-        const { getNextBatch, getTestData: gtd } = await getDatasetFromPg({
+        const { getNextBatch } = await getDatasetFromPg({
           // folder: path.resolve(datasetFolder),
           // test: false,
-          batchSize: recordsPerDataset,
-          filter,
+          batchSize: 30000, //recordsPerDataset,
+          groups,
+          // filter,
           //noDupes: true, //per batch
           // dupeCacheSize,
           // singleMoveRatio,
@@ -309,14 +324,15 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
           // singleBalanceGroupRatio,
         });
         console.log('getDatasetFromPg for lessons initialized');
+
         return {
-          getNextDatasets: async ({ iterationIndex } = {}) => {
-            // console.log({ iterationIndex });
+          getNextDatasets: async () => {
+            const started = Date.now();
             const records = await getNextBatch();
-            console.log(`Loaded ${records.length} training records.`);
+            console.log(`Loaded ${records.length} records in ${((Date.now() - started) / 1000).toFixed(2)} seconds.`);
             return { trainData: records };
           },
-          getTestData: gtd,
+          getTestData: getNextBatch,
         };
       })());
 

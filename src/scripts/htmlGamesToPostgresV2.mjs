@@ -46,11 +46,13 @@ const moveKeys = [
   'hit_soon_total',
   'chkmate_soon_total',
   'result_total',
-  'hit_soon_avg',
-  'chkmate_soon_avg',
-  'result_avg',
+  'progress_total',
+  // 'hit_soon_avg',
+  // 'chkmate_soon_avg',
+  // 'result_avg',
+  // 'progress_avg',
   'count',
-  'rnd',
+  // 'rnd',
 ];
 
 // alphazero's valuation https://arxiv.org/pdf/2009.04374.pdf
@@ -490,11 +492,11 @@ const summarizeMoves = (movesInput) => {
     // progress_total = excluded.progress_total + scid_fens.progress_total,
     // count = excluded.count + scid_fens.count;
 
-    ['hit_soon_total', 'chkmate_soon_total', 'result_total', 'count'].forEach((key) => {
+    ['hit_soon_total', 'chkmate_soon_total', 'result_total', 'progress_total', 'count'].forEach((key) => {
       moves[`${move.fen}${move.onehot_move}`][key] = moves[`${move.fen}${move.onehot_move}`][key] + move[key];
     });
 
-    ['hit_soon', 'chkmate_soon', 'result'].forEach((key) => {
+    ['hit_soon', 'chkmate_soon', 'progress', 'result'].forEach((key) => {
       moves[`${move.fen}${move.onehot_move}`][key + '_avg'] =
         moves[`${move.fen}${move.onehot_move}`][key + '_total'] / moves[`${move.fen}${move.onehot_move}`].count;
     });
@@ -624,10 +626,11 @@ const run = async () => {
           chkmate_soon_total = excluded.chkmate_soon_total + scid_fen_moves.chkmate_soon_total,
           result_total = excluded.result_total + scid_fen_moves.result_total,
           progress_total = excluded.progress_total + scid_fen_moves.progress_total,
-          count = excluded.count + scid_fen_moves.count,
+          count = excluded.count + scid_fen_moves.count;
+
           --hit_soon_avg = (excluded.hit_soon_total + scid_fen_moves.hit_soon_total)/(excluded.count + scid_fen_moves.count),
           --chkmate_soon_avg = (excluded.chkmate_soon_total + scid_fen_moves.chkmate_soon_total)/(excluded.count + scid_fen_moves.count),
-          --result_avg = (excluded.result_total + scid_fen_moves.result_total)::float/(excluded.count + scid_fen_moves.count);
+          --result_avg = (excluded.result_total + scid_fen_moves.result_total)::float/(excluded.count + scid_fen_moves.count),
           --progress_avg = (excluded.progress_total + scid_fen_moves.progress_total)::float/(excluded.count + scid_fen_moves.count);
       `,
     );

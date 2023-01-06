@@ -39,6 +39,9 @@ CREATE TABLE scid_fen_moves (
     count INTEGER NOT NULL
 );
 
+--CREATE INDEX scid_fen_moves_fen_progress_count ON scid_fen_moves(fen,progress_total,count)
+
+
 --CREATE INDEX scid_fen_moves_fen ON scid_fen_moves(fen);
 --CREATE INDEX scid_fen_moves_rnd ON scid_fen_moves(rnd);
 
