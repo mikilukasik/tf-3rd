@@ -1,19 +1,20 @@
 import tf from '@tensorflow/tfjs-node';
 import { promises as fs, readFileSync } from 'fs';
 import path from 'path';
-import { getDatasetFromPg } from './src/scripts/utils/getDatasetFromPg.mjs';
+import { getDatasetFromPg } from './src/utils/workers/pgReader.mjs';
 import { getXs } from './transformGrouped.js';
 
 // const initialSourceModelDirName = 'models/pg1_large_v1'; // gone :(
 // const initialSourceModelDirName = 'models/pg2_small_v1';
-const initialSourceModelDirName = 'models/pg2_small_balanced1_0.002/4.19807291-1672991901188';
-const targetModelName = 'models/pg2_small_balanced1';
+// const initialSourceModelDirName = 'models/pg2_small_balanced1_0.002/4.19807291-1672991901188';
+const initialSourceModelDirName = 'models/pg2_small_balanced1_0.0005/3.24099469-1673027200115';
+const targetModelName = 'models/pg2_small_balanced1x';
 
 // const singleMoveRatio = undefined; // 7.5;
 // const singleProgressGroupRatio = undefined; // 1.48;
 // const singleBalanceGroupRatio = undefined; //1;
 
-const initialLearningRate = 0.001; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
+const initialLearningRate = 0.0005; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
 const finalLearningRate = 0.0000001;
 const makeTrainableBelowLr = 0; // 0.0001; //0.00005;
 
