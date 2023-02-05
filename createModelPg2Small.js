@@ -5,7 +5,7 @@ const path = require('path');
 const creatorFilename = 'createModelPg2Small.js';
 
 const versionName = 'v1';
-const modelName = 'pg2_small';
+const modelName = 'pg2_small_sig';
 
 const modelDirName = `models/${modelName}_${versionName}`;
 const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
@@ -57,8 +57,8 @@ const outputLayer = ({ input }) =>
     .dense({
       units: outUnits,
       useBias: false,
-      activation: 'softmax',
-      name: `${versionName}__softmax_output-${Math.random().toString().slice(2)}`,
+      activation: 'sigmoid',
+      name: `${versionName}__sigmoid_output-${Math.random().toString().slice(2)}`,
     })
     .apply(input);
 

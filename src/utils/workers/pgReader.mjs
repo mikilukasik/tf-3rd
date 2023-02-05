@@ -1,7 +1,20 @@
 import { Worker } from 'worker_threads';
 
 export const getDatasetFromPg = async ({ batchSize = 5000, pointers = {}, groups = { default: { take: 1 } } } = {}) => {
-  const worker = new Worker('./src/utils/workers/workerExample.js', { workerData: { batchSize, pointers, groups } });
+  const groupsWithStringifiedFunctions = Object.keys(groups).reduce(
+    (gwsf, key) => ({
+      ...gwsf,
+      [key]: {
+        ...groups[key],
+        ...(groups[key].postFilter ? { postFilter: groups[key].postFilter.toString() } : {}),
+      },
+    }),
+    {},
+  );
+
+  const worker = new Worker('./src/utils/workers/pgReaderWorker.js', {
+    workerData: { batchSize, pointers, groups: groupsWithStringifiedFunctions },
+  });
 
   const awaitingHandlers = {};
 
@@ -32,8 +45,3 @@ export const getDatasetFromPg = async ({ batchSize = 5000, pointers = {}, groups
     getNextBatch,
   };
 };
-
-// getDatasetFromPg()
-//   .then(({ getNextBatch }) => getNextBatch())
-//   .then(console.log)
-//   .catch(console.error);

@@ -87,7 +87,7 @@ export const addMoveIndicatorsV2 = ({ record, records, index, aborted_ending }) 
     const moveIndicators = getMoveIndicators({ fen, nextFen });
     // console.log({ fen, moveIndicators });
     const wNextMoveIndicators = getWNextMoveIndicators({ fen, moveIndicators });
-    console.log({ fen, nextFen, moveIndicators, wNextMoveIndicators });
+    // console.log({ fen, nextFen, moveIndicators, wNextMoveIndicators });
 
     return Object.assign({}, record, {
       orig_move_indexes: moveIndicators,

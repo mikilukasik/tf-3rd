@@ -2,19 +2,27 @@ import tf from '@tensorflow/tfjs-node';
 import { promises as fs, readFileSync } from 'fs';
 import path from 'path';
 import { getDatasetFromPg } from './src/utils/workers/pgReader.mjs';
-import { getXs } from './transformGrouped.js';
+import { getXs } from './transformGroupedV2.mjs';
+
+const fileNamesToCopy = {
+  'train.mjs': './trainGroupedV2.mjs',
+  'loader.js': './dist/grouped_loader.js',
+  'datasetReader.mjs': './src/utils/workers/pgReader.mjs',
+  'pgReaderWorker.js': './src/utils/workers/pgReaderWorker.js',
+  'transforms.mjs': './transformGroupedV2.mjs',
+};
 
 // const initialSourceModelDirName = 'models/pg1_large_v1'; // gone :(
-// const initialSourceModelDirName = 'models/pg2_small_v1';
-// const initialSourceModelDirName = 'models/pg2_small_balanced1_0.002/4.19807291-1672991901188';
-const initialSourceModelDirName = 'models/pg2_small_balanced1x_0.00025/3.04444575-1673048885730';
-const targetModelName = 'models/pg2_small_balanced1x';
+const initialSourceModelDirName = 'models/pg2_small_sig_v1';
+// const initialSourceModelDirName = 'models/pg2_small_balanced1x_0.0001/6.77704430-1673144591691';
+// const initialSourceModelDirName = 'models/pg2_small_balanced1x_0.00025/3.04444575-1673048885730';
+const targetModelName = 'models/pg2_small_sig_v1';
 
 // const singleMoveRatio = undefined; // 7.5;
 // const singleProgressGroupRatio = undefined; // 1.48;
 // const singleBalanceGroupRatio = undefined; //1;
 
-const initialLearningRate = 0.000125; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
+const initialLearningRate = 0.002; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
 const finalLearningRate = 0.0000001;
 const makeTrainableBelowLr = 0; // 0.0001; //0.00005;
 
@@ -28,15 +36,18 @@ const iterationsPerEval = 10;
 const inUnits = 12;
 const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
 
+const postFilter = (row) => row.moves.find(({ hit_soon }) => hit_soon >= 0);
+
 const generateProgressGroups = (divider, minimum) => {
   const groups = {};
   let minVal = 1 / divider;
   let maxVal;
 
   while (minVal > minimum) {
-    const groupName = `${minVal.toFixed(3)} - ${maxVal ? maxVal.toFixed(3) : '1'}}`;
+    const groupName = `${minVal.toFixed(3)} - ${maxVal ? maxVal.toFixed(3) : '1'}`;
     groups[groupName] = {
       preFilter: `progress > ${minVal}${maxVal ? ` AND progress < ${maxVal}` : ''}`,
+      postFilter,
       take: (maxVal || 1) - minVal,
     };
     maxVal = minVal;
@@ -45,20 +56,14 @@ const generateProgressGroups = (divider, minimum) => {
 
   groups[`0 - ${maxVal.toFixed(3)}`] = {
     preFilter: `progress < ${maxVal}`,
+    postFilter,
     take: maxVal,
   };
 
   return groups;
 };
 
-const groups = generateProgressGroups(1.5, 0.025);
-
-const fileNamesToCopy = {
-  'train.mjs': './trainGrouped.mjs',
-  'loader.js': './dist/grouped_loader.js',
-  'datasetReader.mjs': './src/scripts/utils/getDatasetFromPg.mjs',
-  'transforms.js': './transformGrouped.js',
-};
+const groups = generateProgressGroups(1.7, 0.04);
 
 const filesToCopy = Object.keys(fileNamesToCopy).reduce((p, c) => {
   p[c] = readFileSync(path.resolve(fileNamesToCopy[c]), 'utf-8');
@@ -98,10 +103,14 @@ const transformRecord = (record) => {
     // lmt, //.map((val) => val.toString(16).padStart(2, '0')).join(''),
   } = record;
 
+  const filteredMoves = moves.filter(({ hit_soon }) => hit_soon >= 0);
+  const largestCount = Math.max(...filteredMoves.map(({ count }) => count));
+  // console.log({ filteredMoves, largestCount });
+
   const ys = new Array(outUnits).fill(0);
 
-  moves.forEach(({ onehot_move, count, hit_soon, result }) => {
-    ys[Number(onehot_move)] = (result + hit_soon) / 8 + 0.75; // -1 for none, 0-1 for moves that happened
+  filteredMoves.forEach(({ onehot_move, count, hit_soon, result }) => {
+    ys[Number(onehot_move)] = count / largestCount; // -1 for none, 0-1 for moves that happened
     // ys[Number(onehot_move)] = (result / 2 + 0.5 + hit_soon) / 8 + 0.75; // -1 for none, 0-1 for moves that happened
   });
   const xs = getXs({ fens: [fen] });
@@ -164,7 +173,7 @@ const evaluateModel = async function ({ model, tempFolder }) {
 
   const evalResult = await model.evaluateDataset(testData);
 
-  const [loss, categoricalCrossentropy] = evalResult.map((r) =>
+  const [loss, binaryCrossentropy] = evalResult.map((r) =>
     r
       .dataSync()
       .join()
@@ -173,7 +182,7 @@ const evaluateModel = async function ({ model, tempFolder }) {
       .join(', '),
   );
 
-  const result = { loss, categoricalCrossentropy };
+  const result = { loss, binaryCrossentropy };
 
   if (tempFolder)
     await fs.writeFile(
@@ -255,15 +264,15 @@ const run = async function () {
       nextEvalIn = iterationsPerEval;
       console.log('evaluating...');
 
-      const { categoricalCrossentropy } = await evaluateModel({ model });
-      console.log(`categoricalCrossentropy: ${categoricalCrossentropy}`);
+      const { binaryCrossentropy } = await evaluateModel({ model });
+      console.log(`binaryCrossentropy: ${binaryCrossentropy}`);
 
-      const modelFolderForSaving = path.resolve(modelDirName, `${categoricalCrossentropy}-${Date.now()}`);
+      const modelFolderForSaving = path.resolve(modelDirName, `${binaryCrossentropy}-${Date.now()}`);
 
-      if (typeof currentBest === 'undefined' || Number(categoricalCrossentropy) <= Number(currentBest)) {
-        currentBest = categoricalCrossentropy;
+      if (typeof currentBest === 'undefined' || Number(binaryCrossentropy) <= Number(currentBest)) {
+        currentBest = binaryCrossentropy;
 
-        await saveModel({ model, categoricalCrossentropy, modelDirName: modelFolderForSaving });
+        await saveModel({ model, binaryCrossentropy, modelDirName: modelFolderForSaving });
 
         for (const folder of previousBestFolders) {
           console.log('deleting worse model:', { folder });
@@ -281,14 +290,14 @@ const run = async function () {
       iterationsWithNoImprovement += 1;
 
       console.log({
-        categoricalCrossentropy,
+        binaryCrossentropy,
         currentBest,
         iterationsWithNoImprovement,
         learningRate,
       });
 
       // if (Math.random() > 0.9) {
-      //   await saveModel({ model, categoricalCrossentropy, modelDirName: modelFolderForSaving });
+      //   await saveModel({ model, binaryCrossentropy, modelDirName: modelFolderForSaving });
       //   previousBestFolders.push(modelFolderForSaving);
       // }
     } while (iterationsWithNoImprovement < maxIterationsWithoutImprovement);
@@ -317,6 +326,7 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
           // test: false,
           batchSize: recordsPerDataset,
           groups,
+
           // filter,
           //noDupes: true, //per batch
           // dupeCacheSize,
@@ -348,8 +358,8 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
     }
     model.compile({
       optimizer: tf.train.adam(learningRate),
-      loss: 'categoricalCrossentropy',
-      metrics: [tf.metrics.categoricalCrossentropy],
+      loss: 'binaryCrossentropy',
+      metrics: [tf.metrics.binaryCrossentropy],
     });
     model.summary();
 
@@ -366,8 +376,8 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
       await loadTestData();
 
       console.log('Starting initial evaluation...');
-      const { categoricalCrossentropy } = await evaluateModel({ model, testData });
-      console.log({ 'Initial categoricalCrossentropy': categoricalCrossentropy });
+      const { binaryCrossentropy } = await evaluateModel({ model, testData });
+      console.log({ 'Initial binaryCrossentropy': binaryCrossentropy });
     }
 
     alreadyInited = true;

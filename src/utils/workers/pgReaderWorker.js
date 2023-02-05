@@ -9,7 +9,23 @@ const pgClient = new Client({
   port: 54320,
 });
 
-const { batchSize = 5000, pointers = {}, groups = { default: { take: 1 } } } = workerData;
+const {
+  batchSize = 5000,
+  pointers = {},
+  groups: groupsWithStringifiedFunctions = { default: { take: 1 } },
+} = workerData;
+const groups = Object.keys(groupsWithStringifiedFunctions).reduce(
+  (grs, key) => ({
+    ...grs,
+    [key]: {
+      ...groupsWithStringifiedFunctions[key],
+      ...(groupsWithStringifiedFunctions[key].postFilter
+        ? { postFilter: eval(groupsWithStringifiedFunctions[key].postFilter) }
+        : {}),
+    },
+  }),
+  {},
+);
 
 const totalGroupTakes = Object.values(groups).reduce((p, { take }) => p + take, 0);
 const takeMultiplier = batchSize / totalGroupTakes;
@@ -19,27 +35,38 @@ const takePerGroup = Object.keys(groups).reduce((groupTakes, groupName) => {
   return groupTakes;
 }, {});
 
+let largestId;
 let nextBatch;
-const nextBatchAwaiters = [];
-
 let initStarted;
 let inited;
 const pgClientResolvers = [];
+const nextBatchAwaiters = [];
+const datasetReadCounts = {};
+
 const init = () =>
   new Promise((r) => {
     if (inited) return r();
-    if (initStarted) return pgClientResolvers.push(r);
+    pgClientResolvers.push(r);
 
+    if (initStarted) return;
     initStarted = true;
+
     pgClient
       .connect()
       .then(() => {
-        inited = true;
         return pgClient.query('SELECT $1::text as message', ['Postgres connected']);
       })
       .then((res) => {
         console.log(res.rows[0].message);
-        r();
+        return pgClient.query(`
+          SELECT id FROM public.fens_agg
+          ORDER BY id DESC
+          limit 1
+        `);
+      })
+      .then((largestIdRaw) => {
+        largestId = Number(largestIdRaw.rows[0].id);
+        inited = true;
         while (pgClientResolvers.length) pgClientResolvers.pop()();
       })
       .catch(console.error);
@@ -72,10 +99,10 @@ const rowMapper = ({ id, fen, moves }) => ({
   })),
 });
 
-const readMore = async ({ takeMax, pointers, pointerKey, preFilter }) => {
+const readMore = async ({ takeMax, pointers: _pointers, pointerKey, preFilter }) => {
   const rawData = await pgClient.query(`
     SELECT id, fen, moves FROM public.fens_agg
-    WHERE id > ${pointers[pointerKey].id}
+    WHERE id > ${_pointers[pointerKey].id}
     ${preFilter ? `AND ${preFilter}` : ''}
     ORDER BY id
     limit ${Math.min(5000, takeMax)};
@@ -83,38 +110,72 @@ const readMore = async ({ takeMax, pointers, pointerKey, preFilter }) => {
 
   const parsedData = rawData.rows.map(rowMapper);
 
-  pointers[pointerKey].id = parsedData.length ? parsedData[parsedData.length - 1].id : 0;
+  if (parsedData.length) {
+    _pointers[pointerKey].id = parsedData[parsedData.length - 1].id;
+    return parsedData;
+  }
+
+  _pointers[pointerKey].id = 0;
+  datasetReadCounts[pointerKey] = (datasetReadCounts[pointerKey] || 0) + 1;
+  console.log(`completed dataset for group ${pointerKey}. Read counts per group:`, datasetReadCounts);
 
   return parsedData;
 };
 
-const readFromGroup = async ({ pointers, pointerKey, take, preFilter, postFilter = () => true }) => {
+const readerBusyWithGroups = {};
+const readerAwaitersPerGroup = [];
+
+const readFromGroup = ({ pointerKey, ...rest }) =>
+  new Promise((resolve) => {
+    if (!readerBusyWithGroups[pointerKey]) {
+      readerBusyWithGroups[pointerKey] = true;
+      return readFromGroupNoThrottle({ pointerKey, ...rest }).then((result) => {
+        const nextTask = (readerAwaitersPerGroup[pointerKey] || []).shift();
+        readerBusyWithGroups[pointerKey] = false;
+
+        if (nextTask) {
+          readFromGroup({ pointerKey: nextTask.pointerKey, ...nextTask.rest }).then(nextTask.resolve);
+        }
+        resolve(result);
+      });
+    }
+
+    readerAwaitersPerGroup[pointerKey] = (readerAwaitersPerGroup[pointerKey] || []).concat({
+      pointerKey,
+      rest,
+      resolve,
+    });
+  });
+
+const readFromGroupNoThrottle = async ({
+  pointers: _pointers,
+  pointerKey,
+  take,
+  preFilter,
+  postFilter = () => true,
+}) => {
   const result = [];
   if (!take) return result;
 
-  if (!pointers[pointerKey]) {
-    const largestId = Number(
-      (
-        await pgClient.query(`
-          SELECT id FROM public.fens_agg
-          ORDER BY id DESC
-          limit 1
-        `)
-      ).rows[0].id,
-    );
-
+  if (!_pointers[pointerKey]) {
     const id = Math.floor(Math.random() * largestId);
 
-    console.log(`starting to read dataset for group ${pointerKey} (take ${take}) from id ${id}`);
+    console.log(
+      id,
+      largestId,
+      `starting to read dataset for group ${pointerKey} (take ${take}) from ${((id / largestId) * 100).toFixed(1)}%`,
+    );
 
-    pointers[pointerKey] = {
+    _pointers[pointerKey] = {
       id,
     };
   }
 
   let remaining = take;
   while (remaining) {
-    const records = (await readMore({ takeMax: remaining, pointers, pointerKey, preFilter })).filter(postFilter);
+    const records = (await readMore({ takeMax: remaining, pointers: _pointers, pointerKey, preFilter })).filter(
+      postFilter,
+    );
     remaining -= records.length;
     result.push(...records);
   }
@@ -124,8 +185,9 @@ const readFromGroup = async ({ pointers, pointerKey, take, preFilter, postFilter
   return result;
 };
 
-const loadNextBatch = async ({ ratio = 1 } = {}) => {
+const loadNextBatch = async ({ ratio = 1, _pointers = pointers } = {}) => {
   // if (nextBatch && ratio === 1) throw new Error('tried to double-load batch');
+  await init();
   console.log('loading batch', ratio);
 
   const result = [];
@@ -133,7 +195,7 @@ const loadNextBatch = async ({ ratio = 1 } = {}) => {
   await Promise.all(
     Object.keys(groups).map(async (groupName) => {
       const groupResults = await readFromGroup({
-        pointers,
+        pointers: _pointers,
         pointerKey: groupName,
         ...groups[groupName],
         take: Math.ceil(takePerGroup[groupName] * ratio),
@@ -159,21 +221,21 @@ const loadNextBatch = async ({ ratio = 1 } = {}) => {
   }
 };
 
-loadNextBatch();
+setTimeout(loadNextBatch, 500);
 
-const getNextBatch = ({ ratio = 1 } = {}) =>
+const getNextBatch = ({ ratio = 1, _pointers = pointers } = {}) =>
   ratio === 1
     ? new Promise((r) => {
         if (nextBatch) {
           r(nextBatch);
           nextBatch = null;
-          loadNextBatch({ ratio });
+          loadNextBatch({ ratio, pointers: _pointers });
           return;
         }
 
         nextBatchAwaiters.push(r);
       })
-    : loadNextBatch({ ratio });
+    : loadNextBatch({ ratio, pointers: _pointers });
 
 const messageHandlers = {
   getNextBatch,

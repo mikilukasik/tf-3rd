@@ -2,18 +2,18 @@ import * as path from 'path';
 import { promises as fs } from 'fs';
 
 const RECORDS_PER_FILE = 5000;
-const FILES_PER_FOLDER = 100;
+// const FILES_PER_FOLDER = 100;
 
 export const discWriter = ({ groups, recordsFolder, gamesFolder = 'default' }) => {
   const cache = {};
   const counters = {};
-  const activeSubFolders = {};
+  // const activeSubFolders = {};
 
   const writeCache = async () => {
     for (const folder of Object.keys(cache)) {
       if (cache[folder].length === 0) continue;
 
-      const subFolder = path.resolve(folder, activeSubFolders[folder].toString());
+      const subFolder = path.resolve(folder); //, activeSubFolders[folder].toString());
 
       console.log(`writing into ${subFolder}`);
 
@@ -35,10 +35,10 @@ export const discWriter = ({ groups, recordsFolder, gamesFolder = 'default' }) =
       cache[folder].length = 0;
       counters[subFolder] += 1;
 
-      if (counters[subFolder] > FILES_PER_FOLDER) {
-        activeSubFolders[folder] += 1;
-        delete counters[subFolder];
-      }
+      // if (counters[subFolder] > FILES_PER_FOLDER) {
+      //   // activeSubFolders[folder] += 1;
+      //   delete counters[subFolder];
+      // }
     }
   };
 
@@ -55,19 +55,19 @@ export const discWriter = ({ groups, recordsFolder, gamesFolder = 'default' }) =
         const folder = path.resolve(
           recordsFolder,
           groupName,
-          `test-${Boolean(record.t || record.test)}`,
+          // `test-${Boolean(record.t || record.test)}`,
           getPath(record),
         );
 
         if (!cache[folder]) {
           cache[folder] = [];
-          activeSubFolders[folder] = 0;
+          // activeSubFolders[folder] = 0;
         }
 
         cache[folder].push(transform(record));
 
         if (cache[folder].length >= RECORDS_PER_FILE) {
-          const subFolder = path.resolve(folder, activeSubFolders[folder].toString());
+          const subFolder = path.resolve(folder); //, activeSubFolders[folder].toString());
 
           if (!counters[subFolder]) {
             counters[subFolder] = 0;
@@ -82,10 +82,10 @@ export const discWriter = ({ groups, recordsFolder, gamesFolder = 'default' }) =
           cache[folder].length = 0;
           counters[subFolder] += 1;
 
-          if (counters[subFolder] > FILES_PER_FOLDER) {
-            activeSubFolders[folder] += 1;
-            delete counters[subFolder];
-          }
+          // if (counters[subFolder] > FILES_PER_FOLDER) {
+          //   // activeSubFolders[folder] += 1;
+          //   delete counters[subFolder];
+          // }
         }
       }
     }
