@@ -5,21 +5,21 @@ import { datasetReader } from './src/scripts/utils/getMovesDatasetPgV7.mjs';
 import { getXs } from './transform.js';
 
 // const initialSourceModelDirName = 'models/pg1_large_v1'; // gone :(
-const initialSourceModelDirName = 'models/newestTriple_v1';
-const targetModelName = 'models/newestTriple_tV9_v1';
+const initialSourceModelDirName = 'models/small_tV5_mUpUbUd100k_0.001/2.36505580-1670062022308';
+const targetModelName = 'models/small_tV10_mUpUbU_v1';
 
 const singleMoveRatio = undefined; // 7.5;
 const singleProgressGroupRatio = undefined; // 1.48;
 const singleBalanceGroupRatio = undefined; //1;
 
 const initialLearningRate = 0.0001; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
-const finalLearningRate = 0.000001;
+const finalLearningRate = 0.0000001;
 const makeTrainableBelowLr = 0; // 0.0001; //0.00005;
 
 const recordsPerDataset = 30000;
 const testRecordsPerDataset = 20000;
 const batchSize = 5000;
-const maxIterationsWithoutImprovement = 10; //10;
+const maxIterationsWithoutImprovement = 15; //10;
 const iterationsPerEval = 10;
 const dupeCacheSize = 50000;
 
@@ -63,7 +63,7 @@ const getIsDupe = () => {
 };
 
 const fileNamesToCopy = {
-  'train.mjs': './trainV9.mjs',
+  'train.mjs': './trainV10.mjs',
   'loader.js': './dist/pg_loader.js',
   'datasetReader.mjs': './src/scripts/utils/getMovesDatasetPgV7.mjs',
   'transforms.js': './transform.js',
@@ -332,6 +332,7 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
           // test: false,
           batchSize: recordsPerDataset,
           filter,
+          balanceGroups: 5,
           //noDupes: true, //per batch
           dupeCacheSize,
           singleMoveRatio,

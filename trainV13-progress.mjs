@@ -1,30 +1,33 @@
 import tf from '@tensorflow/tfjs-node';
 import { promises as fs, readFileSync } from 'fs';
 import path from 'path';
-import { datasetReader } from './src/scripts/utils/getMovesDatasetPgV7.mjs';
+import { datasetReader } from './src/scripts/utils/getMovesDatasetPgV13.mjs';
 import { getXs } from './transform.js';
 
+const datasetFolder = './data/csv_v2/default'; //  /newest and /newest2
+
 // const initialSourceModelDirName = 'models/pg1_large_v1'; // gone :(
-const initialSourceModelDirName = 'models/newestTriple_v1';
-const targetModelName = 'models/newestTriple_tV9_v1';
+const initialSourceModelDirName = 'models/newest_tV12-progress_v1_0.001/0.07501695-1675951537307';
+// const initialSourceModelDirName = 'models/newest_progress_v1';
+const targetModelName = 'models/newest_tV13-progress_v1';
 
 const singleMoveRatio = undefined; // 7.5;
 const singleProgressGroupRatio = undefined; // 1.48;
 const singleBalanceGroupRatio = undefined; //1;
 
-const initialLearningRate = 0.0001; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
+const initialLearningRate = 0.0005; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
 const finalLearningRate = 0.000001;
 const makeTrainableBelowLr = 0; // 0.0001; //0.00005;
 
-const recordsPerDataset = 30000;
+const recordsPerDataset = 50000;
 const testRecordsPerDataset = 20000;
-const batchSize = 5000;
+const batchSize = 10000;
 const maxIterationsWithoutImprovement = 10; //10;
 const iterationsPerEval = 10;
 const dupeCacheSize = 50000;
 
 const inUnits = 14;
-const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
+// const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
 
 // all
 const filter = (data) => Number(data[2]) >= 0; //|| data[4] === '1'; //||
@@ -37,35 +40,48 @@ const filter = (data) => Number(data[2]) >= 0; //|| data[4] === '1'; //||
 //openings
 // const filter = (data) => Number(data[2]) >= 0 && data[7] === '0'; //|| Math.random() < 0.01;
 
+// const groupTransformer = () => [{ pointerKey: '.', ratio: 1 }];
+
 const getIsDupe = () => {
   const dupeCache = {};
 
   return (record) => {
-    const [fen, move, valueAsStr] = record;
-    const value = Number(valueAsStr);
+    if (dupeCache[record[0]]) return true;
 
-    if (!dupeCache[fen]) {
-      dupeCache[fen] = { [move]: value, max: value };
-      return false;
-    }
-
-    if (dupeCache[fen].max > value) return true; // existing is better
-
-    // we now got a new best val for that fen
-
-    const result = typeof dupeCache[fen][move] !== 'undefined';
-
-    dupeCache[fen].max = value;
-    dupeCache[fen][move] = value;
-
-    return result;
+    dupeCache[record[0]] = true;
+    return false;
   };
 };
 
+// const getIsDupe = () => {
+//   const dupeCache = {};
+
+//   return (record) => {
+//     const [fen, move, valueAsStr] = record;
+//     const value = Number(valueAsStr);
+
+//     if (!dupeCache[fen]) {
+//       dupeCache[fen] = { [move]: value, max: value };
+//       return false;
+//     }
+
+//     if (dupeCache[fen].max > value) return true; // existing is better
+
+//     // we now got a new best val for that fen
+
+//     const result = typeof dupeCache[fen][move] !== 'undefined';
+
+//     dupeCache[fen].max = value;
+//     dupeCache[fen][move] = value;
+
+//     return result;
+//   };
+// };
+
 const fileNamesToCopy = {
-  'train.mjs': './trainV9.mjs',
+  'train.mjs': './trainV13-progress.mjs',
   'loader.js': './dist/pg_loader.js',
-  'datasetReader.mjs': './src/scripts/utils/getMovesDatasetPgV7.mjs',
+  'datasetReader.mjs': './src/scripts/utils/getMovesDatasetPgV13.mjs',
   'transforms.js': './transform.js',
 };
 
@@ -79,21 +95,11 @@ let testData;
 let alreadySetTrainable = false;
 
 let getNextDatasets;
+let getNextTestBatch;
 
 const loadTestData = async () => {
-  // const { getNextBatch } = await datasetReader({
-  //   test: true,
-  //   batchSize: testRecordsPerDataset,
-  //   filter,
-  //   // filter: (data) => Number(data[2]) >= 0,
-  //   dupeCacheSize,
-  //   singleMoveRatio,
-  //   singleProgressGroupRatio,
-  //   singleBalanceGroupRatio,
-  // });
-
-  // console.log('datasetReaderV5 for test samples initialized, getting test samples...');
-  const rawTestData = await getNextDatasets({ batchSize: testRecordsPerDataset, isDupe: getIsDupe() });
+  console.log('loading new testData...');
+  const rawTestData = await getNextTestBatch({ batchSize: testRecordsPerDataset, isDupe: getIsDupe() });
   console.log(`Loaded ${rawTestData.length} test samples.`);
   testData = loadData(rawTestData.map(transformRecord).filter(Boolean));
 };
@@ -109,21 +115,23 @@ const transformRecord = (record) => {
     fen,
     onehot_move,
     hit_soon,
-    chkmate_soon,
+    // chkmate_soon,
     result,
     chkmate_ending,
     stall_ending,
-    p, // ? 0 : is_midgame ? 1 : 2,
-    is_last,
+    // p, // ? 0 : is_midgame ? 1 : 2,
+    // is_last,
     lmf, //.map((val) => val.toString(16).padStart(2, '0')).join(''),
     lmt, //.map((val) => val.toString(16).padStart(2, '0')).join(''),
-    move_index,
-    total_moves,
+    // move_index,
+    // total_moves,
     progress,
   ] = record;
 
-  const ys = new Array(outUnits).fill(0);
-  ys[Number(onehot_move)] = 1;
+  // const ys = new Array(outUnits).fill(0);
+  // ys[Number(onehot_move)] = 1;
+
+  const ys = [Number(progress)];
 
   const xs = getXs({ fens: [fen], lmf, lmt });
 
@@ -181,10 +189,11 @@ const trainModel = async function ({ model, trainData }) {
 // verify the model against the test data
 const evaluateModel = async function ({ model, tempFolder }) {
   // console.log(`Tensors in memory before eval: ${tf.memory().numTensors}`);
+  if (!testData) await loadTestData();
 
   const evalResult = await model.evaluateDataset(testData);
 
-  const [loss, categoricalCrossentropy] = evalResult.map((r) =>
+  const [loss, meanAbsoluteError] = evalResult.map((r) =>
     r
       .dataSync()
       .join()
@@ -193,7 +202,7 @@ const evaluateModel = async function ({ model, tempFolder }) {
       .join(', '),
   );
 
-  const result = { loss, categoricalCrossentropy };
+  const result = { loss, meanAbsoluteError };
 
   if (tempFolder)
     await fs.writeFile(
@@ -204,6 +213,8 @@ const evaluateModel = async function ({ model, tempFolder }) {
 
   evalResult.forEach((t) => t.dispose());
   console.log(`Tensors in memory after eval: ${tf.memory().numTensors}`);
+
+  await loadTestData();
 
   return result;
 };
@@ -270,15 +281,17 @@ const run = async function () {
       nextEvalIn = iterationsPerEval;
       console.log('evaluating...');
 
-      const { categoricalCrossentropy } = await evaluateModel({ model });
-      console.log(`categoricalCrossentropy: ${categoricalCrossentropy}`);
+      const { meanAbsoluteError } = await evaluateModel({ model });
+      console.log(`meanAbsoluteError: ${meanAbsoluteError}`);
 
-      const modelFolderForSaving = path.resolve(modelDirName, `${categoricalCrossentropy}-${Date.now()}`);
+      // await loadTestData();
 
-      if (typeof currentBest === 'undefined' || Number(categoricalCrossentropy) <= Number(currentBest)) {
-        currentBest = categoricalCrossentropy;
+      const modelFolderForSaving = path.resolve(modelDirName, `${meanAbsoluteError}-${Date.now()}`);
 
-        await saveModel({ model, categoricalCrossentropy, modelDirName: modelFolderForSaving });
+      if (typeof currentBest === 'undefined' || Number(meanAbsoluteError) <= Number(currentBest)) {
+        currentBest = meanAbsoluteError;
+
+        await saveModel({ model, meanAbsoluteError, modelDirName: modelFolderForSaving });
 
         for (const folder of previousBestFolders) {
           console.log('deleting worse model:', { folder });
@@ -290,20 +303,25 @@ const run = async function () {
 
         sourceModelDirName = modelFolderForSaving;
         iterationsWithNoImprovement = 0;
+
+        // await loadTestData();
+
         continue;
       }
 
       iterationsWithNoImprovement += 1;
 
       console.log({
-        categoricalCrossentropy,
+        meanAbsoluteError,
         currentBest,
         iterationsWithNoImprovement,
         learningRate,
       });
 
+      // await loadTestData();
+
       // if (Math.random() > 0.9) {
-      //   await saveModel({ model, categoricalCrossentropy, modelDirName: modelFolderForSaving });
+      //   await saveModel({ model, meanAbsoluteError, modelDirName: modelFolderForSaving });
       //   previousBestFolders.push(modelFolderForSaving);
       // }
     } while (iterationsWithNoImprovement < maxIterationsWithoutImprovement);
@@ -326,8 +344,8 @@ let alreadyInited = false;
 const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
   try {
     if (!alreadyInited)
-      getNextDatasets = await (async () => {
-        const { getNextBatch } = await datasetReader({
+      ({ getNextDatasets, getNextTestBatch } = await (async () => {
+        const { getNextBatch, getNextTestBatch } = await datasetReader({
           // folder: path.resolve(datasetFolder),
           // test: false,
           batchSize: recordsPerDataset,
@@ -337,15 +355,22 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
           singleMoveRatio,
           singleProgressGroupRatio,
           singleBalanceGroupRatio,
+
+          datasetFolder,
+          // groupTransformer,
         });
         console.log('datasetReaderV5 for lessons initialized');
-        return async (options) => {
-          // console.log({ iterationIndex });
-          const records = await getNextBatch(options);
-          console.log(`Loaded ${records.length} records.`);
-          return records;
+        return {
+          getNextDatasets: async (options) => {
+            // console.log({ iterationIndex });
+            const records = await getNextBatch(options);
+            console.log(`Loaded ${records.length} records.`);
+            return records;
+          },
+
+          getNextTestBatch,
         };
-      })();
+      })());
 
     const sourceModelFolder = path.resolve(sourceModelDirName);
     const model = await loadModel({ folder: sourceModelFolder, learningRate });
@@ -358,8 +383,8 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
     }
     model.compile({
       optimizer: tf.train.adam(learningRate),
-      loss: 'categoricalCrossentropy',
-      metrics: [tf.metrics.categoricalCrossentropy],
+      loss: 'meanAbsoluteError',
+      metrics: [tf.metrics.meanAbsoluteError],
     });
     model.summary();
 
@@ -373,11 +398,11 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
     );
 
     if (!alreadyInited) {
-      await loadTestData();
+      // await loadTestData();
 
       console.log('Starting initial evaluation...');
-      const { categoricalCrossentropy } = await evaluateModel({ model, testData });
-      console.log({ 'Initial categoricalCrossentropy': categoricalCrossentropy });
+      const { meanAbsoluteError } = await evaluateModel({ model, testData });
+      console.log({ 'Initial meanAbsoluteError': meanAbsoluteError });
     }
 
     alreadyInited = true;

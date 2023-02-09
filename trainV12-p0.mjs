@@ -1,24 +1,26 @@
 import tf from '@tensorflow/tfjs-node';
 import { promises as fs, readFileSync } from 'fs';
 import path from 'path';
-import { datasetReader } from './src/scripts/utils/getMovesDatasetPgV7.mjs';
+import { datasetReader } from './src/scripts/utils/getMovesDatasetPgV12.mjs';
 import { getXs } from './transform.js';
 
+const datasetFolder = './data/csv_v2/default/0.00 - 0.25'; //  /newest and /newest2
+
 // const initialSourceModelDirName = 'models/pg1_large_v1'; // gone :(
-const initialSourceModelDirName = 'models/newestTriple_v1';
-const targetModelName = 'models/newestTriple_tV9_v1';
+const initialSourceModelDirName = 'models/newest_v1';
+const targetModelName = 'models/newest_tV12-p0_v1';
 
 const singleMoveRatio = undefined; // 7.5;
 const singleProgressGroupRatio = undefined; // 1.48;
 const singleBalanceGroupRatio = undefined; //1;
 
-const initialLearningRate = 0.0001; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
+const initialLearningRate = 0.001; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
 const finalLearningRate = 0.000001;
 const makeTrainableBelowLr = 0; // 0.0001; //0.00005;
 
-const recordsPerDataset = 30000;
+const recordsPerDataset = 50000;
 const testRecordsPerDataset = 20000;
-const batchSize = 5000;
+const batchSize = 10000;
 const maxIterationsWithoutImprovement = 10; //10;
 const iterationsPerEval = 10;
 const dupeCacheSize = 50000;
@@ -37,35 +39,48 @@ const filter = (data) => Number(data[2]) >= 0; //|| data[4] === '1'; //||
 //openings
 // const filter = (data) => Number(data[2]) >= 0 && data[7] === '0'; //|| Math.random() < 0.01;
 
+const groupTransformer = () => [{ pointerKey: '.', ratio: 1 }];
+
 const getIsDupe = () => {
   const dupeCache = {};
 
   return (record) => {
-    const [fen, move, valueAsStr] = record;
-    const value = Number(valueAsStr);
+    if (dupeCache[record[0]]) return true;
 
-    if (!dupeCache[fen]) {
-      dupeCache[fen] = { [move]: value, max: value };
-      return false;
-    }
-
-    if (dupeCache[fen].max > value) return true; // existing is better
-
-    // we now got a new best val for that fen
-
-    const result = typeof dupeCache[fen][move] !== 'undefined';
-
-    dupeCache[fen].max = value;
-    dupeCache[fen][move] = value;
-
-    return result;
+    dupeCache[record[0]] = true;
+    return false;
   };
 };
 
+// const getIsDupe = () => {
+//   const dupeCache = {};
+
+//   return (record) => {
+//     const [fen, move, valueAsStr] = record;
+//     const value = Number(valueAsStr);
+
+//     if (!dupeCache[fen]) {
+//       dupeCache[fen] = { [move]: value, max: value };
+//       return false;
+//     }
+
+//     if (dupeCache[fen].max > value) return true; // existing is better
+
+//     // we now got a new best val for that fen
+
+//     const result = typeof dupeCache[fen][move] !== 'undefined';
+
+//     dupeCache[fen].max = value;
+//     dupeCache[fen][move] = value;
+
+//     return result;
+//   };
+// };
+
 const fileNamesToCopy = {
-  'train.mjs': './trainV9.mjs',
+  'train.mjs': './trainV12-p0.mjs',
   'loader.js': './dist/pg_loader.js',
-  'datasetReader.mjs': './src/scripts/utils/getMovesDatasetPgV7.mjs',
+  'datasetReader.mjs': './src/scripts/utils/getMovesDatasetPgV12.mjs',
   'transforms.js': './transform.js',
 };
 
@@ -109,16 +124,16 @@ const transformRecord = (record) => {
     fen,
     onehot_move,
     hit_soon,
-    chkmate_soon,
+    // chkmate_soon,
     result,
     chkmate_ending,
     stall_ending,
-    p, // ? 0 : is_midgame ? 1 : 2,
-    is_last,
+    // p, // ? 0 : is_midgame ? 1 : 2,
+    // is_last,
     lmf, //.map((val) => val.toString(16).padStart(2, '0')).join(''),
     lmt, //.map((val) => val.toString(16).padStart(2, '0')).join(''),
-    move_index,
-    total_moves,
+    // move_index,
+    // total_moves,
     progress,
   ] = record;
 
@@ -337,6 +352,9 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
           singleMoveRatio,
           singleProgressGroupRatio,
           singleBalanceGroupRatio,
+
+          datasetFolder,
+          groupTransformer,
         });
         console.log('datasetReaderV5 for lessons initialized');
         return async (options) => {

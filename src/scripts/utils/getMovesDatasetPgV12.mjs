@@ -4,16 +4,16 @@ import { promises as fs } from 'fs';
 import { getRandomFileFromDir } from './getRandomFileFromDir.mjs';
 import { shuffle } from '../../../chss-module-engine/src/utils/schuffle.js';
 
-const datasetFolder = './data/csv_v1/default'; //  /newest and /newest2
+// const datasetFolder = './data/csv_v2/default'; //  /newest and /newest2
 
 const inUnits = 14;
 const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
 
-const getGroups = async () => {
+const getGroups = async ({ datasetFolder, groupTransformer }) => {
   const dirContents = (await fs.readdir(datasetFolder)).sort();
   const ratio = 1 / dirContents.length;
   const groups = dirContents.map((pointerKey) => ({ pointerKey, ratio }));
-  return groups;
+  return groupTransformer(groups);
 };
 
 const getNextFileName = async (fileName, rootFolder, deepFileName, subCall = false, beginningToEnd) => {
@@ -196,7 +196,11 @@ export const datasetReader = async ({
   // pointers: _pointers = {},
   filter,
 
-  balanceGroups = 20,
+  // balanceGroups = 20,
+
+  datasetFolder,
+
+  groupTransformer = (gs) => gs,
 
   // test = false,
   // dupeCacheMinutes = 1,
@@ -210,7 +214,7 @@ export const datasetReader = async ({
   const folder = path.resolve(datasetFolder);
   const pointers = {}; //Object.assign({}, _pointers);
 
-  const groups = await getGroups();
+  const groups = await getGroups({ datasetFolder, groupTransformer });
 
   // let isDupe = () => false;
   // if (dupeCacheSize) {
