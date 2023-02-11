@@ -9,9 +9,12 @@ const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight
 
 const getGroups = async ({ datasetFolder, groupTransformer }) => {
   const dirContents = (await fs.readdir(datasetFolder)).sort();
-  const ratio = 1 / dirContents.length;
-  const groups = dirContents.map((pointerKey) => ({ pointerKey, ratio }));
-  return groupTransformer(groups);
+  // const ratio = 1 / dirContents.length;
+  const groups = dirContents.map((pointerKey) => ({ pointerKey /* , ratio */ }));
+  const transformedGroups = groupTransformer(groups);
+  const ratio = 1 / transformedGroups.length;
+
+  return transformedGroups.map(({ pointerKey }) => ({ pointerKey, ratio }));
 };
 
 const getNextFileName = async (fileName, rootFolder, deepFileName, subCall = false, beginningToEnd) => {

@@ -7,15 +7,15 @@ import { getXs } from './transform.js';
 const datasetFolder = './data/csv_v2/default/0.00 - 0.25'; //  /newest and /newest2
 
 // const initialSourceModelDirName = 'models/pg1_large_v1'; // gone :(
-const initialSourceModelDirName = 'models/newest_tV12-p0_v1_0.00003125/1.66224957-1675963312515';
+const initialSourceModelDirName = 'models/newest_SM_v1';
 // const initialSourceModelDirName = 'models/newest_progress_v1';
-const targetModelName = 'models/newest_tV13-p0_v1';
+const targetModelName = 'models/newest_SM_tV13-p0_v1';
 
 const singleMoveRatio = undefined; // 7.5;
 const singleProgressGroupRatio = undefined; // 1.48;
 const singleBalanceGroupRatio = undefined; //1;
 
-const initialLearningRate = 0.00003125; //0.0005; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
+const initialLearningRate = 0.0005; //0.0005; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
 const finalLearningRate = 0.000001;
 const makeTrainableBelowLr = 0; // 0.0001; //0.00005;
 

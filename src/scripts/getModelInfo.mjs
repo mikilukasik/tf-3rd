@@ -1,7 +1,7 @@
 import * as tf from '@tensorflow/tfjs-node';
 import * as path from 'path';
 
-const sourceModelDirName = 'models/pg1_small_v1';
+const sourceModelDirName = '/Users/miki/dev/petproject/chss/chss-service-model-store/models/pg_large';
 
 const loadModel = async ({ folder }) => {
   const model = await tf.loadLayersModel(`file://${folder}/model.json`);
