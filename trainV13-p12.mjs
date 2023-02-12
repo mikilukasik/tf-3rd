@@ -6,16 +6,15 @@ import { getXs } from './transform.js';
 
 const datasetFolder = './data/csv_v2/default'; //  /newest and /newest2
 
-// const initialSourceModelDirName = 'models/pg1_large_v1'; // gone :(
-const initialSourceModelDirName = 'models/newest_M_v1';
-// const initialSourceModelDirName = 'models/newest_progress_v1';
+// const initialSourceModelDirName = 'models/newest_M_v1';
+const initialSourceModelDirName = 'models/newest_M_tV13-p12_v1_0.0005/2.45479345-1676151288999';
 const targetModelName = 'models/newest_M_tV13-p12_v1';
 
-const singleMoveRatio = undefined; // 7.5;
-const singleProgressGroupRatio = undefined; // 1.48;
-const singleBalanceGroupRatio = undefined; //1;
+// const singleMoveRatio = undefined; // 7.5;
+// const singleProgressGroupRatio = undefined; // 1.48;
+// const singleBalanceGroupRatio = undefined; //1;
 
-const initialLearningRate = 0.0005; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
+const initialLearningRate = 0.0001; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
 const finalLearningRate = 0.000001;
 const makeTrainableBelowLr = 0; // 0.0001; //0.00005;
 
@@ -24,13 +23,13 @@ const testRecordsPerDataset = 20000;
 const batchSize = 10000;
 const maxIterationsWithoutImprovement = 10; //10;
 const iterationsPerEval = 10;
-const dupeCacheSize = 50000;
+// const dupeCacheSize = 50000;
 
 const inUnits = 14;
 const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
 
 // all
-const filter = (data) => Number(data[2]) >= 0; //|| data[4] === '1'; //||
+const filter = (data) => Number(data[2]) >= 0;
 // some other moves too
 // Math.random() < 0.005;
 
@@ -351,15 +350,15 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
           batchSize: recordsPerDataset,
           filter,
           //noDupes: true, //per batch
-          dupeCacheSize,
-          singleMoveRatio,
-          singleProgressGroupRatio,
-          singleBalanceGroupRatio,
+          // dupeCacheSize,
+          // singleMoveRatio,
+          // singleProgressGroupRatio,
+          // singleBalanceGroupRatio,
 
           datasetFolder,
           groupTransformer,
         });
-        console.log('datasetReaderV5 for lessons initialized');
+        console.log('datasetReaderV13 initialized');
         return {
           getNextDatasets: async (options) => {
             // console.log({ iterationIndex });
