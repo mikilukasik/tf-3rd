@@ -34,6 +34,22 @@ module.exports = [
     },
   },
   {
+    entry: './src/lib/transformsSrc/fromto_loader.js',
+    module: {},
+    resolve: {
+      extensions: ['.js'],
+    },
+    output: {
+      filename: 'fromto_loader.js',
+      path: path.resolve(__dirname, 'dist'),
+      library: {
+        name: 'loader',
+        type: 'assign',
+        export: 'default',
+      },
+    },
+  },
+  {
     entry: './src/lib/transformsSrc/pg_all_loader.js',
     module: {},
     resolve: {
