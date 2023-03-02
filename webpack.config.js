@@ -34,6 +34,22 @@ module.exports = [
     },
   },
   {
+    entry: './src/lib/transformsSrc/python_loader.js',
+    module: {},
+    resolve: {
+      extensions: ['.js'],
+    },
+    output: {
+      filename: 'python_loader.js',
+      path: path.resolve(__dirname, 'dist'),
+      library: {
+        name: 'loader',
+        type: 'assign',
+        export: 'default',
+      },
+    },
+  },
+  {
     entry: './src/lib/transformsSrc/fromto_loader.js',
     module: {},
     resolve: {

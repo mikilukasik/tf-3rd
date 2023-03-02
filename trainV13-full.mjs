@@ -6,27 +6,32 @@ import { getXs } from './transform.js';
 
 const datasetFolder = './data/csv_v2/default'; //  /newest and /newest2
 
-const initialSourceModelDirName = 'models/newest_L_v1_0.0001/2.66516900-1677204999733';
-// const initialSourceModelDirName = 'models/newest_L_v1';
-const targetModelName = 'models/newest_L_v1';
+const initialSourceModelDirName = 'models/tweakedChampion_0.000005/1.98678970-1677324107401';
+// const initialSourceModelDirName = 'models/tweakedChampion';
+const targetModelName = 'models/tweakedChampion';
 
 // const singleMoveRatio = undefined; // 7.5;
 // const singleProgressGroupRatio = undefined; // 1.48;
 // const singleBalanceGroupRatio = undefined; //1;
 
-const initialLearningRate = 0.0001; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
-const finalLearningRate = 0.000001;
+const initialLearningRate = 0.000002; //0.0001; //0.001; //0.0005; //0.0005; //0.0005; //0.000125; //0.000015625; //0.001;
+const finalLearningRate = 0.0000001;
 const makeTrainableBelowLr = 0; //0.00002; // 0.0001; //0.00005;
 
 const recordsPerDataset = 50000;
 const testRecordsPerDataset = 20000;
-const batchSize = 128;
+const batchSize = 256;
 const maxIterationsWithoutImprovement = 20; //10;
 const iterationsPerEval = 10;
 // const dupeCacheSize = 50000;
 
 const inUnits = 14;
 const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
+
+let lossToBeat;
+let oldLossToBeat;
+
+const makeLayersTrainable = ['v1__dense_leakyReLU_u5000-35373653038400055'];
 
 // all
 const filter = (data) => Number(data[2]) >= 0;
@@ -82,10 +87,16 @@ const fileNamesToCopy = {
   'loader.js': './dist/pg_loader.js',
   'datasetReader.mjs': './src/scripts/utils/getMovesDatasetPgV13.mjs',
   'transforms.js': './transform.js',
+  'createModel.js': path.resolve(initialSourceModelDirName, 'createModel.js'),
 };
 
 const filesToCopy = Object.keys(fileNamesToCopy).reduce((p, c) => {
-  p[c] = readFileSync(path.resolve(fileNamesToCopy[c]), 'utf-8');
+  try {
+    p[c] = readFileSync(path.resolve(fileNamesToCopy[c]), 'utf-8');
+  } catch (e) {
+    console.warn(`Error loading ${fileNamesToCopy[c]}, will not copy`);
+  }
+
   return p;
 }, {});
 
@@ -185,11 +196,7 @@ const trainModel = async function ({ model, trainData }) {
   return result;
 };
 
-// verify the model against the test data
-const evaluateModel = async function ({ model, tempFolder }) {
-  // console.log(`Tensors in memory before eval: ${tf.memory().numTensors}`);
-  if (!testData) await loadTestData();
-
+const getLoss = async ({ model }) => {
   const evalResult = await model.evaluateDataset(testData);
 
   const [loss, categoricalCrossentropy] = evalResult.map((r) =>
@@ -201,19 +208,53 @@ const evaluateModel = async function ({ model, tempFolder }) {
       .join(', '),
   );
 
-  const result = { loss, categoricalCrossentropy };
-
-  if (tempFolder)
-    await fs.writeFile(
-      path.resolve(tempFolder, 'evaluation.json'),
-      JSON.stringify({ ...result, evalResult }, null, 2),
-      'utf8',
-    );
-
   evalResult.forEach((t) => t.dispose());
   console.log(`Tensors in memory after eval: ${tf.memory().numTensors}`);
 
-  await loadTestData();
+  return { loss, categoricalCrossentropy };
+};
+
+// verify the model against the test data
+const evaluateModel = async function ({ model, initial }) {
+  // console.log(`Tensors in memory before eval: ${tf.memory().numTensors}`);
+  if (initial) await loadTestData();
+
+  // const evalResult = await model.evaluateDataset(testData);
+
+  // const [loss, categoricalCrossentropy] = evalResult.map((r) =>
+  //   r
+  //     .dataSync()
+  //     .join()
+  //     .split()
+  //     .map((n) => Number(n).toFixed(8))
+  //     .join(', '),
+  // );
+
+  // const result = { loss, categoricalCrossentropy };
+
+  // if (tempFolder)
+  //   await fs.writeFile(
+  //     path.resolve(tempFolder, 'evaluation.json'),
+  //     JSON.stringify({ ...result, evalResult }, null, 2),
+  //     'utf8',
+  //   );
+
+  // evalResult.forEach((t) => t.dispose());
+  // console.log(`Tensors in memory after eval: ${tf.memory().numTensors}`);
+
+  const result = await getLoss({ model });
+  result.isBetter = Number(result.categoricalCrossentropy) <= Number(lossToBeat);
+
+  oldLossToBeat = lossToBeat;
+
+  if (initial) {
+    lossToBeat = result.categoricalCrossentropy;
+  } else {
+    await loadTestData();
+    ({ categoricalCrossentropy: lossToBeat } = await getLoss({ model }));
+  }
+
+  console.log({ newLossToBeat: lossToBeat, oldLossToBeat });
 
   return result;
 };
@@ -254,7 +295,7 @@ const runIteration = async ({ model, iterationIndex }) => {
 };
 
 // run
-let currentBest;
+// let currentBest;
 
 const run = async function () {
   let sourceModelDirName = initialSourceModelDirName;
@@ -272,7 +313,7 @@ const run = async function () {
       await await runIteration({ model });
 
       if (nextEvalIn > 0) {
-        console.log({ nextEvalIn, currentBest, iterationsWithNoImprovement });
+        console.log({ nextEvalIn, lossToBeat, iterationsWithNoImprovement });
         nextEvalIn -= 1;
         continue;
       }
@@ -280,15 +321,16 @@ const run = async function () {
       nextEvalIn = iterationsPerEval;
       console.log('evaluating...');
 
-      const { categoricalCrossentropy } = await evaluateModel({ model });
+      const { categoricalCrossentropy, isBetter } = await evaluateModel({ model });
       console.log(`categoricalCrossentropy: ${categoricalCrossentropy}`);
 
       // await loadTestData();
 
       const modelFolderForSaving = path.resolve(modelDirName, `${categoricalCrossentropy}-${Date.now()}`);
 
-      if (typeof currentBest === 'undefined' || Number(categoricalCrossentropy) <= Number(currentBest)) {
-        currentBest = categoricalCrossentropy;
+      if (isBetter) {
+        // if (/*typeof currentBest === 'undefined' ||*/ Number(categoricalCrossentropy) <= Number(lossToBeat)) {
+        // currentBest = categoricalCrossentropy;
 
         await saveModel({ model, categoricalCrossentropy, modelDirName: modelFolderForSaving });
 
@@ -312,7 +354,7 @@ const run = async function () {
 
       console.log({
         categoricalCrossentropy,
-        currentBest,
+        oldLossToBeat,
         iterationsWithNoImprovement,
         learningRate,
       });
@@ -324,6 +366,13 @@ const run = async function () {
       //   previousBestFolders.push(modelFolderForSaving);
       // }
     } while (iterationsWithNoImprovement < maxIterationsWithoutImprovement);
+
+    //saving the model we worked on but ssems worse
+    await saveModel({
+      model,
+      categoricalCrossentropy: 'lastForgotten',
+      modelDirName: path.resolve(modelDirName, `lastForgotten-${Date.now()}`),
+    });
 
     try {
       model.dispose();
@@ -374,6 +423,16 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
     const sourceModelFolder = path.resolve(sourceModelDirName);
     const model = await loadModel({ folder: sourceModelFolder, learningRate });
 
+    if (makeLayersTrainable && makeLayersTrainable.length) {
+      model.layers.forEach((l) => {
+        console.log(l.name);
+        if (makeLayersTrainable.includes(l.name) && !l.trainable) {
+          console.log(`making trainable: ${l.name}`);
+          l.trainable = true;
+        }
+      });
+    }
+
     if (makeTrainableBelowLr && learningRate <= makeTrainableBelowLr) {
       if (!alreadySetTrainable)
         console.log(`learningRate fell below ${makeTrainableBelowLr}, making all layers trainable...`);
@@ -400,7 +459,7 @@ const init = async ({ learningRate, modelDirName, sourceModelDirName }) => {
       // await loadTestData();
 
       console.log('Starting initial evaluation...');
-      const { categoricalCrossentropy } = await evaluateModel({ model, testData });
+      const { categoricalCrossentropy } = await evaluateModel({ model, initial: true });
       console.log({ 'Initial categoricalCrossentropy': categoricalCrossentropy });
     }
 
