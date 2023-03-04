@@ -72,7 +72,6 @@ const getXs = ({ fens, lmt, lmf }) => {
 
         xs[currentIndex - 2] = getLmValActualStrIndex(lmf, (currentIndex / inUnits - 1) * 2);
         xs[currentIndex - 1] = getLmValActualStrIndex(lmt, (currentIndex / inUnits - 1) * 2);
-        // arr.push([1,0,0,0,0,0,0,0,0,0,0,0]);
         break;
       case 'b':
         xs[currentIndex + 1] = 1;
@@ -80,35 +79,30 @@ const getXs = ({ fens, lmt, lmf }) => {
 
         xs[currentIndex - 2] = getLmValActualStrIndex(lmf, (currentIndex / inUnits - 1) * 2);
         xs[currentIndex - 1] = getLmValActualStrIndex(lmt, (currentIndex / inUnits - 1) * 2);
-        // arr.push([0,1,0,0,0,0,0,0,0,0,0,0]);
         break;
       case 'n':
         xs[currentIndex + 2] = 1;
         currentIndex += inUnits;
         xs[currentIndex - 2] = getLmValActualStrIndex(lmf, (currentIndex / inUnits - 1) * 2);
         xs[currentIndex - 1] = getLmValActualStrIndex(lmt, (currentIndex / inUnits - 1) * 2);
-        // arr.push([0,0,1,0,0,0,0,0,0,0,0,0]);
         break;
       case 'r':
         xs[currentIndex + 3] = 1;
         currentIndex += inUnits;
         xs[currentIndex - 2] = getLmValActualStrIndex(lmf, (currentIndex / inUnits - 1) * 2);
         xs[currentIndex - 1] = getLmValActualStrIndex(lmt, (currentIndex / inUnits - 1) * 2);
-        // arr.push([0,0,0,1,0,0,0,0,0,0,0,0]);
         break;
       case 'q':
         xs[currentIndex + 4] = 1;
         currentIndex += inUnits;
         xs[currentIndex - 2] = getLmValActualStrIndex(lmf, (currentIndex / inUnits - 1) * 2);
         xs[currentIndex - 1] = getLmValActualStrIndex(lmt, (currentIndex / inUnits - 1) * 2);
-        // arr.push([0,0,0,0,1,0,0,0,0,0,0,0]);
         break;
       case 'k':
         xs[currentIndex + 5] = 1;
         currentIndex += inUnits;
         xs[currentIndex - 2] = getLmValActualStrIndex(lmf, (currentIndex / inUnits - 1) * 2);
         xs[currentIndex - 1] = getLmValActualStrIndex(lmt, (currentIndex / inUnits - 1) * 2);
-        // arr.push([0,0,0,0,0,1,0,0,0,0,0,0]);
         break;
 
       case 'P':
@@ -116,42 +110,36 @@ const getXs = ({ fens, lmt, lmf }) => {
         currentIndex += inUnits;
         xs[currentIndex - 2] = getLmValActualStrIndex(lmf, (currentIndex / inUnits - 1) * 2);
         xs[currentIndex - 1] = getLmValActualStrIndex(lmt, (currentIndex / inUnits - 1) * 2);
-        // arr.push([0,0,0,0,0,0,1,0,0,0,0,0]);
         break;
       case 'B':
         xs[currentIndex + 7] = 1;
         currentIndex += inUnits;
         xs[currentIndex - 2] = getLmValActualStrIndex(lmf, (currentIndex / inUnits - 1) * 2);
         xs[currentIndex - 1] = getLmValActualStrIndex(lmt, (currentIndex / inUnits - 1) * 2);
-        // arr.push([0,0,0,0,0,0,0,1,0,0,0,0]);
         break;
       case 'N':
         xs[currentIndex + 8] = 1;
         currentIndex += inUnits;
         xs[currentIndex - 2] = getLmValActualStrIndex(lmf, (currentIndex / inUnits - 1) * 2);
         xs[currentIndex - 1] = getLmValActualStrIndex(lmt, (currentIndex / inUnits - 1) * 2);
-        // arr.push([0,0,0,0,0,0,0,0,1,0,0,0]);
         break;
       case 'R':
         xs[currentIndex + 9] = 1;
         currentIndex += inUnits;
         xs[currentIndex - 2] = getLmValActualStrIndex(lmf, (currentIndex / inUnits - 1) * 2);
         xs[currentIndex - 1] = getLmValActualStrIndex(lmt, (currentIndex / inUnits - 1) * 2);
-        // arr.push([0,0,0,0,0,0,0,0,0,1,0,0]);
         break;
       case 'Q':
         xs[currentIndex + 10] = 1;
         currentIndex += inUnits;
         xs[currentIndex - 2] = getLmValActualStrIndex(lmf, (currentIndex / inUnits - 1) * 2);
         xs[currentIndex - 1] = getLmValActualStrIndex(lmt, (currentIndex / inUnits - 1) * 2);
-        // arr.push([0,0,0,0,0,0,0,0,0,0,1,0]);
         break;
       case 'K':
         xs[currentIndex + 11] = 1;
         currentIndex += inUnits;
         xs[currentIndex - 2] = getLmValActualStrIndex(lmf, (currentIndex / inUnits - 1) * 2);
         xs[currentIndex - 1] = getLmValActualStrIndex(lmt, (currentIndex / inUnits - 1) * 2);
-        // arr.push([0,0,0,0,0,0,0,0,0,0,0,1]);
         break;
 
       case '/':
@@ -197,6 +185,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs[currentIndex] = 1;
 
         xs += '1,0,0,0,0,0,0,0,0,0,0,0,';
+        // xs += '1,,,,,,,,,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
         currentIndex += 2;
@@ -206,6 +195,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // currentIndex += inUnits;
 
         xs += '0,1,0,0,0,0,0,0,0,0,0,0,';
+        // xs += ',1,,,,,,,,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
         currentIndex += 2;
@@ -214,6 +204,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs[currentIndex + 2] = 1;
 
         xs += '0,0,1,0,0,0,0,0,0,0,0,0,';
+        // xs += ',,1,,,,,,,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
         currentIndex += 2;
@@ -222,6 +213,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs[currentIndex + 3] = 1;
 
         xs += '0,0,0,1,0,0,0,0,0,0,0,0,';
+        // xs += ',,,1,,,,,,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
         currentIndex += 2;
@@ -230,6 +222,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs[currentIndex + 4] = 1;
 
         xs += '0,0,0,0,1,0,0,0,0,0,0,0,';
+        // xs += ',,,,1,,,,,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
         currentIndex += 2;
@@ -238,6 +231,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs[currentIndex + 5] = 1;
 
         xs += '0,0,0,0,0,1,0,0,0,0,0,0,';
+        // xs += ',,,,,1,,,,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
         currentIndex += 2;
@@ -247,6 +241,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs[currentIndex + 6] = 1;
 
         xs += '0,0,0,0,0,0,1,0,0,0,0,0,';
+        // xs += ',,,,,,1,,,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
         currentIndex += 2;
@@ -255,6 +250,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs[currentIndex + 7] = 1;
 
         xs += '0,0,0,0,0,0,0,1,0,0,0,0,';
+        // xs += ',,,,,,,1,,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
         currentIndex += 2;
@@ -263,6 +259,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs[currentIndex + 8] = 1;
 
         xs += '0,0,0,0,0,0,0,0,1,0,0,0,';
+        // xs += ',,,,,,,,1,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
         currentIndex += 2;
@@ -271,6 +268,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs[currentIndex + 9] = 1;
 
         xs += '0,0,0,0,0,0,0,0,0,1,0,0,';
+        // xs += ',,,,,,,,,1,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
         currentIndex += 2;
@@ -279,6 +277,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs[currentIndex + 10] = 1;
 
         xs += '0,0,0,0,0,0,0,0,0,0,1,0,';
+        // xs += ',,,,,,,,,,1,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
         currentIndex += 2;
@@ -287,6 +286,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs[currentIndex + 11] = 1;
 
         xs += '0,0,0,0,0,0,0,0,0,0,0,1,';
+        // xs += ',,,,,,,,,,,1,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
         currentIndex += 2;
@@ -301,6 +301,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
           //arr.push(Array(12).fill(0));
 
           xs += '0,0,0,0,0,0,0,0,0,0,0,0,';
+          // xs += ',,,,,,,,,,,,';
           xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
           xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
           currentIndex += 2;
