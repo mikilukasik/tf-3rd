@@ -19,5 +19,7 @@ export const addWNextFenV2 = (record) => ({
         wNextResult: record.origResult * -1,
         won: record.origResult === -1,
         lost: record.origResult === 1,
+        w_rating: record.b_rating,
+        b_rating: record.w_rating,
       }),
 });
