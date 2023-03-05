@@ -1,12 +1,11 @@
 import * as path from 'path';
 import { promises as fs } from 'fs';
-
-// import { getRandomFileFromDir } from './getRandomFileFromDir.mjs';
 import { shuffle } from '../../../chss-module-engine/src/utils/schuffle.js';
 import { getSavedObject } from '../../../chss-module-engine/src/utils/savedObject/savedObject.mjs';
 import { getRandomizedFilelist } from './getRandomizedFilelist.mjs';
+import { getXsAsString as getXs } from '../../utils/getXs.js';
 
-const datasetFolder = path.resolve('./data/csv_v2/default');
+const datasetFolder = path.resolve('./data/csv_v4/default');
 
 // const inUnits = 14;
 const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
@@ -43,10 +42,8 @@ const readMore = async ({ takeMax, pointers, pointerKey, folder, beginningToEnd,
   pointers[pointerKey].fileIndex = randomFileOrder
     ? Math.floor(Math.random() * readerMeta.files[pointerKey].length)
     : pointers[pointerKey].fileIndex + 1; // % readerMeta.files[pointerKey].length,
-  console.log('hssssello', pointers[pointerKey].fileIndex, readerMeta.files[pointerKey].length);
 
   if (pointers[pointerKey].fileIndex >= readerMeta.files[pointerKey].length) {
-    console.log('hello');
     pointers[pointerKey].fileIndex = 0;
     shuffle(readerMeta.files[pointerKey]);
     // readerMeta.files[pointerKey].push(...(await getRandomizedFilelist(path.resolve(datasetFolder, pointerKey))));
@@ -183,7 +180,6 @@ export const datasetReader = async (options) => {
 const getDatasetReader = async ({
   filter,
   groupTransformer = (gs) => gs,
-  getXs,
   id: sessionId,
   format: defaultFormat = 'columns',
   readerMeta,
@@ -207,9 +203,24 @@ const getDatasetReader = async ({
   let fensInLastTestBatch = {};
 
   const transformRecord = (record) => {
-    // const [fen, onehot_move, hit_soon, result, chkmate_ending, stall_ending, lmf, lmt, progress] = record;
+    // fen,
+    // onehot_move,
+    // hit_soon,
+    // chkmate_soon,
+    // result,
+    // chkmate_ending ? '1' : '',
+    // stall_ending ? '1' : '',
+    // is_last ? '1' : '',
+    // lmf.map((val) => val.toString(16).padStart(2, '0')).join(''),
+    // lmt.map((val) => val.toString(16).padStart(2, '0')).join(''),
+    // chkmate_ending || stall_ending ? progress : '',
+    // chkmate_ending || stall_ending ? '' : progress * 0.8, // adjusted progress for games that were not completed
+    // w_rating,
+    // b_rating,
+    // min_rating_diff,
+    // max_rating_diff,
 
-    const xs = getXs({ fens: [record[0]], lmf: record[6], lmt: record[7] });
+    const xs = getXs({ fens: [record[0]], lmf: record[8], lmt: record[9] });
     const ys = new Array(outUnits).fill(0);
     ys[record[1] === '' ? 1836 : Number(record[1])] = 1;
 
@@ -337,5 +348,6 @@ const getDatasetReader = async ({
     getNextBatch,
     getNextTestBatch,
     id: sessionId,
+    metadata: readerMeta,
   };
 };
