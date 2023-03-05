@@ -3,6 +3,7 @@ import { promises as fs } from 'fs';
 
 // import { getRandomFileFromDir } from './getRandomFileFromDir.mjs';
 import { shuffle } from '../../../chss-module-engine/src/utils/schuffle.js';
+import { getSavedObject } from '../../../chss-module-engine/src/utils/savedObject/savedObject.mjs';
 import { getRandomizedFilelist } from './getRandomizedFilelist.mjs';
 
 const datasetFolder = path.resolve('./data/csv_v2/default');
@@ -22,13 +23,14 @@ const getGroups = async ({ datasetFolder, groupTransformer }) => {
   return transformedGroups.map(({ pointerKey }) => ({ pointerKey, ratio }));
 };
 
-const readMore = async ({ takeMax, pointers, pointerKey, folder, beginningToEnd, randomFileOrder, fileList }) => {
-  const rawData = await fs.readFile(fileList[pointers[pointerKey].fileIndex], 'utf-8');
+const readMore = async ({ takeMax, pointers, pointerKey, folder, beginningToEnd, randomFileOrder, readerMeta }) => {
+  const rawData = await fs.readFile(readerMeta.files[pointerKey][pointers[pointerKey].fileIndex], 'utf-8');
   const parsedData = rawData
     .trim()
     .split('\n')
     .slice(pointers[pointerKey].lineIndex)
     .map((row) => row.split(',')); // Number() ?
+  // console.log(parsedData.length);
 
   if (parsedData.length > takeMax) {
     pointers[pointerKey].lineIndex = pointers[pointerKey].lineIndex + takeMax;
@@ -36,38 +38,50 @@ const readMore = async ({ takeMax, pointers, pointerKey, folder, beginningToEnd,
     return parsedData.slice(0, takeMax);
   }
 
-  pointers[pointerKey] = {
-    fileIndex: randomFileOrder
-      ? Math.floor(Math.random() * fileList.length)
-      : (pointers[pointerKey].fileIndex + 1) % fileList.length,
-    lineIndex: 0,
-  };
+  // console.log(1, pointers[pointerKey].fileIndex);
+
+  pointers[pointerKey].fileIndex = randomFileOrder
+    ? Math.floor(Math.random() * readerMeta.files[pointerKey].length)
+    : pointers[pointerKey].fileIndex + 1; // % readerMeta.files[pointerKey].length,
+  console.log('hssssello', pointers[pointerKey].fileIndex, readerMeta.files[pointerKey].length);
+
+  if (pointers[pointerKey].fileIndex >= readerMeta.files[pointerKey].length) {
+    console.log('hello');
+    pointers[pointerKey].fileIndex = 0;
+    shuffle(readerMeta.files[pointerKey]);
+    // readerMeta.files[pointerKey].push(...(await getRandomizedFilelist(path.resolve(datasetFolder, pointerKey))));
+  }
+
+  pointers[pointerKey].lineIndex = 0;
+
+  // console.log(2, pointers[pointerKey].fileIndex);
 
   return parsedData;
 };
 
 const readFromGroup = async ({
-  pointers = {},
+  readerMeta,
+  // pointers = {},
   pointerKey,
   take,
-  folder,
+  // folder,
   filter = () => true,
   isDupe,
   beginningToEnd,
   dontLogDupes,
   fensInLastTestBatch = {},
   randomFileOrder,
-  fileList,
+  // fileList,
 }) => {
   console.log('------', Object.keys(fensInLastTestBatch).sort()[0]);
 
   const result = [];
   if (!take) return result;
 
-  const groupFolder = path.resolve(folder, pointerKey);
+  const groupFolder = path.resolve(readerMeta.datasetFolder, pointerKey);
 
   const resetPointer = async (currentPointers) => {
-    const fileIndex = Math.floor(Math.random() * fileList.length);
+    const fileIndex = Math.floor(Math.random() * readerMeta.files[pointerKey].length);
 
     if (!randomFileOrder) console.log(`starting to read dataset from file index ${fileIndex}`);
 
@@ -75,24 +89,26 @@ const readFromGroup = async ({
       fileIndex,
       lineIndex: 0,
     };
-
+    console.log('itt');
     return currentPointers;
   };
 
-  if (!pointers[pointerKey]) {
-    await resetPointer(pointers);
+  if (!readerMeta.pointers[pointerKey]) {
+    await resetPointer(readerMeta.pointers);
   }
 
   let removedDupes = 0;
   let removedTestFens = 0;
   let remaining = take;
+
+  console.log('meg itt');
   while (remaining /* && pointers[pointerKey].fileName*/) {
     const records = (
       await readMore({
         takeMax: remaining,
-        pointers: randomFileOrder ? await resetPointer({}) : pointers,
+        pointers: randomFileOrder ? await resetPointer({}) : readerMeta.pointers,
         pointerKey,
-        fileList,
+        readerMeta,
         folder: groupFolder,
         beginningToEnd,
         randomFileOrder,
@@ -144,22 +160,49 @@ const getFiles = async ({ groups }) => {
   return result;
 };
 
-export const datasetReader = async ({
+const readers = {};
+export const datasetReader = async (options) => {
+  if (readers[options.id]) return readers[options.id];
+
+  console.log({ options });
+  const id = options.id || Date.now().toString() + Math.random().toString().replace('0.', '');
+
+  const { data: readerMeta, methods } = await getSavedObject(`./data/datasetReader/readerMetas/${id}`);
+  await methods.loadData();
+
+  const reader = await getDatasetReader({
+    ...options,
+    id,
+    readerMeta,
+  });
+
+  readers[reader.id] = reader;
+  return reader;
+};
+
+const getDatasetReader = async ({
   filter,
   groupTransformer = (gs) => gs,
   getXs,
-  id: sessionId = console.log(
-    'oooooooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  oooooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  oooooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  oooooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  oooooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  oooooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  oooooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  oooooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  oooooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  oooooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  oooooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo  ooooo   creating new reader',
-  ) || Date.now().toString() + Math.random().toString().replace('0.', ''),
+  id: sessionId,
   format: defaultFormat = 'columns',
-  files: _files,
+  readerMeta,
 }) => {
-  const folder = path.resolve(datasetFolder);
-  let pointers = {};
-  let testPointers = {};
+  console.log('creating new reader... ', { readerMeta });
+
+  if (!sessionId) throw new Error('missing session id in datasetreader');
+
+  if (!readerMeta.datasetFolder) readerMeta.datasetFolder = path.resolve(datasetFolder);
+  if (!readerMeta.pointers) readerMeta.pointers = {};
+  if (!readerMeta.testPointers) readerMeta.testPointers = {};
 
   const groups = await getGroups({ datasetFolder, groupTransformer });
-  const files = _files || (await getFiles({ groups }));
+  if (!readerMeta.files) {
+    const fls = await getFiles({ groups });
+    console.log('filling', Object.keys(fls).length);
+    readerMeta.files = fls;
+  }
+  console.log('sohuold have files', { readerMeta }, readerMeta.files['0.25 - 0.50'][10]);
 
   let fensInLastTestBatch = {};
 
@@ -186,11 +229,12 @@ export const datasetReader = async ({
     const results = await Promise.all(
       groups.map(({ pointerKey, ratio }) =>
         readFromGroup({
-          pointers,
+          readerMeta,
+          // pointers: readerMeta.pointers,
           pointerKey,
-          fileList: files[pointerKey],
+          // fileList: readerMeta.files[pointerKey],
           take: Math.ceil(recordsPerDataset * ratio),
-          folder,
+          // folder: readerMeta.datasetFolder,
           filter,
           isDupe,
           fensInLastTestBatch,
@@ -252,10 +296,10 @@ export const datasetReader = async ({
       const results = await Promise.all(
         groups.map(({ pointerKey, ratio }) =>
           readFromGroup({
-            pointers: testPointers,
+            pointers: readerMeta.testPointers,
             pointerKey,
             take: Math.ceil(recordsPerDataset * ratio),
-            folder,
+            folder: readerMeta.datasetFolder,
             filter: (line) => Math.random() > 0.9 && filter(line),
             isDupe,
             randomFileOrder: true,

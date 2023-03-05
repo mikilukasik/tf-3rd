@@ -35,7 +35,7 @@ export const serveDataset = (app) => {
       });
   };
 
-  app.get('/datasetReader/:id/dataset', async ({ query: { format = 'columns' }, params: { id }, headers }, res) => {
+  app.get('/datasetReader-old/:id/dataset', async ({ query: { format = 'columns' }, params: { id }, headers }, res) => {
     console.log(headers);
 
     try {
@@ -47,7 +47,7 @@ export const serveDataset = (app) => {
     }
   });
 
-  app.get('/datasetReader/:id/testDataset', async ({ query: { format = 'columns' }, params: { id } }, res) => {
+  app.get('/datasetReader-old/:id/testDataset', async ({ query: { format = 'columns' }, params: { id } }, res) => {
     try {
       await ensureDatasetReader(id);
       res[format === 'csv' ? 'send' : 'json'](await datasetReaders[id].getNextTestBatch({ format }));
@@ -58,7 +58,7 @@ export const serveDataset = (app) => {
 
   // get CSV filenames only
 
-  // app.get('/datasetReader/:id/datasetFilename', async ({ params: { id }, headers }, res) => {
+  // app.get('/datasetReader-old/:id/datasetFilename', async ({ params: { id }, headers }, res) => {
   //   console.log(headers);
 
   //   try {
@@ -70,7 +70,7 @@ export const serveDataset = (app) => {
   //   }
   // });
 
-  // app.get('/datasetReader/:id/testDatasetFilename', async ({ params: { id } }, res) => {
+  // app.get('/datasetReader-old/:id/testDatasetFilename', async ({ params: { id } }, res) => {
   //   try {
   //     await ensureDatasetReader(id);
 
@@ -81,7 +81,7 @@ export const serveDataset = (app) => {
   //   }
   // });
 
-  app.get('/datasetReader', async (req, res) => {
+  app.get('/datasetReader-old', async (req, res) => {
     console.log(req.headers);
 
     const dReader = await datasetReader({

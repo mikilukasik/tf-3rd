@@ -2,6 +2,7 @@
 import express from 'express';
 import readGames from './src/utils/readGames.mjs';
 import { serveDataset } from './serveDataset.mjs';
+import { serveDataset as sd2 } from './serveDatasetV2.mjs';
 // import readGames } = require('./src/utils/readGames.mjs');
 // const { readGames } = require('./src/utils/readGames.mjs');
 
@@ -34,6 +35,7 @@ app.get('/games', async (req, res, next) => {
 });
 
 serveDataset(app);
+sd2(app);
 
 app.listen(port, () => {
   console.log(`Example app listening at http://localhost:${port}`);
