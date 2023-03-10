@@ -220,6 +220,8 @@ const getDatasetReader = async ({
     // min_rating_diff,
     // max_rating_diff,
 
+    // console.log({ record });
+
     const xs = getXs({ fens: [record[0]], lmf: record[8], lmt: record[9] });
     const ys = new Array(outUnits).fill(0);
     ys[record[1] === '' ? 1836 : Number(record[1])] = 1;
@@ -228,7 +230,7 @@ const getDatasetReader = async ({
   };
 
   const transformRecordMoveAsLabel = (record) => {
-    return `${getXs({ fens: [record[0]], lmf: record[6], lmt: record[7] })},${
+    return `${getXs({ fens: [record[0]], lmf: record[8], lmt: record[9] })},${
       record[1] === '' ? 1836 : Number(record[1])
     }`;
   };

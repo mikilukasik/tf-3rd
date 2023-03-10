@@ -172,7 +172,7 @@ const getXs = ({ fens, lmt, lmf }) => {
 
 const getXsAsString = ({ fens, lmt, lmf }) => {
   let xs = ''; //new Array(64 * inUnits).fill(0);
-
+  // console.log({ lmf, lmt });
   // const expandedFens = fens.map((fen) => {
   //   if (!fen) return Array(64).fill(Array(12).fill(0));
 

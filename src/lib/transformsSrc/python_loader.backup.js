@@ -1,7 +1,7 @@
 import { board2fen } from '../../../chss-module-engine/src/engine_new/transformers/board2fen.js';
 import { oneHotToMovesV2 } from '../../scripts/utils/oneHotMovesMapV2.mjs';
 
-export default async ({ tf }) => {
+export default async ({ tf, modelUrl }) => {
   console.log('Loading python model...');
   // const model = await tf.loadLayersModel(modelUrl);
 
@@ -258,7 +258,7 @@ export default async ({ tf }) => {
   const predict = async ({ game }) => {
     const xs = gameToXs({ game });
 
-    const u = `{MODEL_URL}?input=${xs.join(',')}`;
+    const u = `${modelUrl}?input=${xs.join(',')}`;
     // console.log(1, u);
     const f = await fetch(u);
     // console.log(2, f);

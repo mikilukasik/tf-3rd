@@ -34,7 +34,7 @@ app.get('/games', async (req, res, next) => {
   res.end();
 });
 
-serveDataset(app);
+// serveDataset(app);
 sd2(app);
 
 app.listen(port, () => {
