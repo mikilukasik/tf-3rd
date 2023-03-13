@@ -83,14 +83,18 @@ export const serveDataset = async (app) => {
 
   app.get(
     '/datasetReader/:id/dataset',
-    async ({ query: { format = 'columns', filter: filterName = '2900' }, params: { id }, headers }, res) => {
+    async (
+      { query: { format = 'columns', filter: filterName = '2900', ysformat = 'default' }, params: { id }, headers },
+      res,
+    ) => {
+      console.log(1, { ysformat });
       try {
         const reader = await getDatasetReader(id, filterName);
-        const batch = await reader.getNextBatch({ format });
+        const batch = await reader.getNextBatch({ format, ysformat });
         reader.metadata.samplesServed =
           (reader.metadata.samplesServed || 0) + (format === 'csv' ? batch.split('\n') : batch.xs).length;
 
-        res[format === 'csv' ? 'send' : 'json'](await reader.getNextBatch({ format }));
+        res[format === 'csv' ? 'send' : 'json'](batch);
       } catch (e) {
         console.error(e);
         res.status(500).send(e.message + e.stack);
