@@ -1,8 +1,12 @@
 import { movesToOneHotV2, oneHotToMovesV2 } from './oneHotMovesMapV2.mjs';
 import {
-  cellStr2cellIndex,
+  // cellStr2cellIndex,
   cellIndex2cellStr,
-} from '../../../chss-module-engine/src/engine_new/transformers/move2string2move.js';
+} from '../../../chss-module-engine/src/engine_new/transformers/cellIndex2cellStr.js';
+import {
+  cellStr2cellIndex,
+  // cellIndex2cellStr,
+} from '../../../chss-module-engine/src/engine_new/transformers/moveString2move.js';
 
 const noMoreCastling = ({ fen }) => {
   const castling = fen.split(' ')[2];
@@ -60,7 +64,7 @@ const mirrorLmfLmtOnX = (lmx) => {
 };
 
 const mirrorOnX = (record) => {
-  const { fen, movestr, wnext_move_indexes, onehot_move, lmf, lmt } = record;
+  const { fen, movestr, wnext_move_indexes, onehot_move, lmf, lmt, moveMap } = record;
 
   const [board, ...restOfFen] = fen.split(' ');
   const newBoard = board.split('/').map(rowReverser).join('/');
@@ -68,6 +72,7 @@ const mirrorOnX = (record) => {
 
   const newLmf = mirrorLmfLmtOnX(lmf);
   const newLmt = mirrorLmfLmtOnX(lmt);
+  const newMoveMap = mirrorLmfLmtOnX(moveMap);
 
   if (!movestr || movestr === 'resign')
     return {
@@ -78,6 +83,7 @@ const mirrorOnX = (record) => {
       wnext_move_indexes,
       lmf: newLmf,
       lmt: newLmt,
+      moveMap: newMoveMap,
       version: 1,
     };
 
@@ -114,6 +120,10 @@ const expandGroupedBlanks = (rowStr) => {
 const mergeBlanks = (rowStr) => rowStr.replace(/[1]+/g, (blanks) => blanks.length);
 
 const rotateFlatArray = (arr) => {
+  if (arr.length !== 64) {
+    console.log(arr, new Array(arr));
+    process.exit(0);
+  }
   const lines = [];
   for (let i = 0; i < arr.length; i += 8) {
     const chunk = arr.slice(i, i + 8);
@@ -176,7 +186,7 @@ const rotateMoveStr = ({ movestr, onehot_move }) => {
 };
 
 const rotate90 = (record) => {
-  const { fen, movestr, wnext_move_indexes, lmf, lmt, onehot_move } = record;
+  const { fen, movestr, wnext_move_indexes, lmf, lmt, onehot_move, moveMap } = record;
 
   const needsRotatedMoves = movestr && movestr !== 'resign';
 
@@ -185,6 +195,7 @@ const rotate90 = (record) => {
     fen: rotateFen(fen),
     lmf: rotateFlatArray(lmf),
     lmt: rotateFlatArray(lmt),
+    moveMap: rotateFlatArray(moveMap),
     wnext_move_indexes: needsRotatedMoves ? rotateMoveIndexes(wnext_move_indexes) : wnext_move_indexes,
     ...rotateMoveStr({ movestr, onehot_move }),
   };

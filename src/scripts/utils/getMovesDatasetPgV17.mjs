@@ -4,6 +4,7 @@ import { shuffle } from '../../../chss-module-engine/src/utils/schuffle.js';
 import { getSavedObject } from '../../../chss-module-engine/src/utils/savedObject/savedObject.mjs';
 import { getRandomizedFilelist } from './getRandomizedFilelist.mjs';
 import { getXsAsString as getXs } from '../../utils/getXs.js';
+import zlib from 'zlib';
 
 const onehot_map = [
   [0, 9, ''],
@@ -1845,12 +1846,12 @@ const onehot_map = [
   [0, 0, ''],
 ];
 
-const datasetFolder = path.resolve('./data/csv_v4/default');
+const datasetFolder = path.resolve('./data/gz_3100all_2900win_v1/default');
 
 // const inUnits = 14;
 const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
 
-const recordsPerDataset = 50000;
+const recordsPerDataset = 25000;
 const testRecordsPerDataset = 20000;
 
 const getGroups = async ({ datasetFolder, groupTransformer }) => {
@@ -1863,7 +1864,24 @@ const getGroups = async ({ datasetFolder, groupTransformer }) => {
 };
 
 const readMore = async ({ takeMax, pointers, pointerKey, folder, beginningToEnd, randomFileOrder, readerMeta }) => {
-  const rawData = await fs.readFile(readerMeta.files[pointerKey][pointers[pointerKey].fileIndex], 'utf-8');
+  const compressedData = await fs.readFile(readerMeta.files[pointerKey][pointers[pointerKey].fileIndex]);
+
+  const rawData = await new Promise((r) => {
+    // Decompress the data using gzip
+    zlib.gunzip(compressedData, (err, uncompressedData) => {
+      if (err) {
+        console.error(err);
+        return;
+      }
+
+      // Convert the uncompressed data to a string
+      const csvData = uncompressedData.toString();
+
+      // Call the callback function with the CSV data
+      r(csvData);
+    });
+  });
+
   const parsedData = rawData
     .trim()
     .split('\n')
@@ -2023,6 +2041,7 @@ const getDatasetReader = async ({
   id: sessionId,
   format: defaultFormat = 'columns',
   ysformat: defaultYsformat = 'default',
+  xsformat: defaultXsformat = 'default',
   readerMeta,
 }) => {
   console.log('creating new reader... ', { readerMeta });
@@ -2070,8 +2089,8 @@ const getDatasetReader = async ({
     return { xs, ys };
   };
 
-  const getTransformRecordMoveAsLabel = ({ ysformat }) =>
-    console.log(2, { ysformat }) ||
+  const getTransformRecordMoveAsLabel = ({ ysformat, xsformat }) =>
+    console.log(2, { ysformat, xsformat }) ||
     (ysformat === '1966'
       ? //   output = Concatenate(name='concat-output')([
         //     combined_softmax,
@@ -2081,13 +2100,16 @@ const getDatasetReader = async ({
         //   ])
         (record) => {
           const ohMove = record[1] === '' ? '1836' : record[1];
-          return `${getXs({ fens: [record[0]], lmf: record[8], lmt: record[9] })},${ohMove},${onehot_map[ohMove].slice(
-            0,
-            2,
-          )},${onehot_map[ohMove][2] ? 1 : 0}`; //
+          return `${getXs({
+            fens: [record[0]],
+            lmf: record[8],
+            lmt: record[9],
+            xsformat,
+            moveMap: record[16],
+          })},${ohMove},${onehot_map[ohMove].slice(0, 2)},${onehot_map[ohMove][2] ? 1 : 0}`; //
         }
       : (record) => {
-          return `${getXs({ fens: [record[0]], lmf: record[8], lmt: record[9] })},${
+          return `${getXs({ fens: [record[0]], lmf: record[8], lmt: record[9], xsformat, moveMap: record[16] })},${
             record[1] === '' ? 1836 : Number(record[1])
           }`;
         });
@@ -2096,6 +2118,7 @@ const getDatasetReader = async ({
     isDupe = getDefaultIsDupe(),
     format = defaultFormat,
     ysformat = defaultYsformat,
+    xsformat = defaultXsformat,
   } = {}) => {
     process.stdout.write('reading data from disc..');
     let started = Date.now();
@@ -2131,7 +2154,7 @@ const getDatasetReader = async ({
     }
 
     if (format === 'csv') {
-      const transformRecordMoveAsLabel = getTransformRecordMoveAsLabel({ ysformat });
+      const transformRecordMoveAsLabel = getTransformRecordMoveAsLabel({ ysformat, xsformat });
       process.stdout.write('transforming dataset for csv format..');
       started = Date.now();
       data = data.map(transformRecordMoveAsLabel);

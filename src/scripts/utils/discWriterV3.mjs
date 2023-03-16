@@ -1,8 +1,35 @@
 import * as path from 'path';
 import { promises as fs } from 'fs';
+import zlib from 'zlib';
 
 const DEFAULT_RECORDS_PER_FILE = 5000;
 // const FILES_PER_FOLDER = 100;
+
+const writeCompressed = (filename, data, encoding) => {
+  const bufferData = Buffer.from(data);
+
+  return new Promise((res, rej) => {
+    // Compress the data using gzip
+    zlib.gzip(bufferData, (err, compressedData) => {
+      if (err) {
+        console.error(err);
+        return rej(err);
+      }
+
+      // Save the compressed data to a file
+      fs.writeFile(filename + '.gz', compressedData)
+        .then(() => {
+          console.log(`Compressed data saved to ${filename}.gz`);
+          return res();
+        })
+        .catch((err) => {
+          console.error(err);
+          return rej(err);
+        });
+    });
+  });
+  //
+};
 
 export const discWriter = ({
   groups,
@@ -22,17 +49,17 @@ export const discWriter = ({
 
       console.log(`writing into ${subFolder}`);
 
-      const fragmentRatio = cache[folder].length / recordsPerFile;
-      if (counters[subFolder] && Math.random() >= fragmentRatio) {
-        counters[subFolder] -= 1;
-      }
+      // const fragmentRatio = cache[folder].length / recordsPerFile;
+      // if (counters[subFolder] && Math.random() >= fragmentRatio) {
+      //   counters[subFolder] -= 1;
+      // }
 
       if (!counters[subFolder]) {
         counters[subFolder] = 0;
         await fs.mkdir(subFolder, { recursive: true });
       }
 
-      await fs.appendFile(
+      await writeCompressed(
         path.resolve(subFolder, `${counters[subFolder]}.csv`),
         `${cache[folder].join('\n')}\n`,
         'utf8',
@@ -47,10 +74,10 @@ export const discWriter = ({
     }
   };
 
-  setInterval(() => {
-    console.log('Writing cache to disc');
-    writeCache();
-  }, 300000);
+  // setInterval(() => {
+  //   console.log('Writing cache to disc');
+  //   writeCache();
+  // }, 300000);
 
   const writeRecordToDisc = async (records) => {
     for (const record of [].concat(records)) {
@@ -79,7 +106,7 @@ export const discWriter = ({
             await fs.mkdir(subFolder, { recursive: true });
           }
 
-          await fs.writeFile(
+          await writeCompressed(
             path.resolve(subFolder, `${counters[subFolder]}.csv`),
             `${cache[folder].join('\n')}\n`,
             'utf8',

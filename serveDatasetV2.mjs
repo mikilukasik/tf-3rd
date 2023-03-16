@@ -1,5 +1,11 @@
-import { datasetReader } from './src/scripts/utils/getMovesDatasetPgV16.mjs';
+import { datasetReader as dr16 } from './src/scripts/utils/getMovesDatasetPgV16.mjs';
+import { datasetReader as dr17 } from './src/scripts/utils/getMovesDatasetPgV17.mjs';
 // import { getXsAsString } from './src/utils/getXs.js';
+
+const datasetReaderVersions = {
+  16: dr16,
+  17: dr17,
+};
 
 import compression from 'compression';
 
@@ -63,10 +69,10 @@ const groupTransformer = (groups) => groups;
 
 const datasetReaders = {};
 
-const getDatasetReader = async (optionalId, filterName = '2900') => {
+const getDatasetReader = async (optionalId, filterName = '2900', readerVersion = '17') => {
   if (optionalId && datasetReaders[optionalId]) return datasetReaders[optionalId];
 
-  const reader = await datasetReader({
+  const reader = await datasetReaderVersions[readerVersion]({
     filter: filters[filterName],
     groupTransformer,
     // getXs: getXsAsString,
@@ -84,13 +90,23 @@ export const serveDataset = async (app) => {
   app.get(
     '/datasetReader/:id/dataset',
     async (
-      { query: { format = 'columns', filter: filterName = '2900', ysformat = 'default' }, params: { id }, headers },
+      {
+        query: {
+          format = 'columns',
+          filter: filterName = '2900',
+          ysformat = 'default',
+          xsformat = 'default',
+          readerVersion = '17',
+        },
+        params: { id },
+        headers,
+      },
       res,
     ) => {
-      console.log(1, { ysformat });
+      console.log(1, { ysformat, xsformat });
       try {
-        const reader = await getDatasetReader(id, filterName);
-        const batch = await reader.getNextBatch({ format, ysformat });
+        const reader = await getDatasetReader(id, filterName, readerVersion);
+        const batch = await reader.getNextBatch({ format, ysformat, xsformat });
         reader.metadata.samplesServed =
           (reader.metadata.samplesServed || 0) + (format === 'csv' ? batch.split('\n') : batch.xs).length;
 
@@ -111,13 +127,16 @@ export const serveDataset = async (app) => {
   //   }
   // });
 
-  app.get('/datasetReader/:id?', async ({ params: { id: optionalId } }, res) => {
-    try {
-      const { id } = await getDatasetReader(optionalId);
-      res.json({ a: 1, id });
-    } catch (e) {
-      console.error(e);
-      res.status(500).send(e.message + e.stack);
-    }
-  });
+  app.get(
+    '/datasetReader/:id?',
+    async ({ params: { id: optionalId }, query: { readerVersion = '17', filter: filterName = '2900' } }, res) => {
+      try {
+        const { id } = await getDatasetReader(optionalId, filterName, readerVersion);
+        res.json({ a: 1, id });
+      } catch (e) {
+        console.error(e);
+        res.status(500).send(e.message + e.stack);
+      }
+    },
+  );
 };

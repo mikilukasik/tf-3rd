@@ -170,11 +170,21 @@ const getXs = ({ fens, lmt, lmf }) => {
   return xs;
 };
 
-const getXsAsString = ({ fens, lmt, lmf }) => {
+const getXsAsString = ({ fens, lmt, lmf, xsformat = 'default', moveMap }) => {
   let xs = ''; //new Array(64 * inUnits).fill(0);
   // console.log({ lmf, lmt });
   // const expandedFens = fens.map((fen) => {
   //   if (!fen) return Array(64).fill(Array(12).fill(0));
+
+  const getMoveMapData = (doubledIndex) => {
+    if (xsformat !== '39') return '';
+
+    const asStr = moveMap.substr((doubledIndex / 2) * 25, 25);
+    // console.log({ asStr });
+    const asArr = asStr.split('').map((char) => 1 - 1 / (parseInt(char, 32) + 1));
+    // console.log({ asArr });
+    return `${asArr.join(',')},`;
+  };
 
   const [board] = fens[0].split(' ');
   // const arr = [];
@@ -188,6 +198,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs += '1,,,,,,,,,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
+        xs += getMoveMapData(currentIndex);
         currentIndex += 2;
         break;
       case 'b':
@@ -198,6 +209,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs += ',1,,,,,,,,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
+        xs += getMoveMapData(currentIndex);
         currentIndex += 2;
         break;
       case 'n':
@@ -207,6 +219,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs += ',,1,,,,,,,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
+        xs += getMoveMapData(currentIndex);
         currentIndex += 2;
         break;
       case 'r':
@@ -216,6 +229,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs += ',,,1,,,,,,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
+        xs += getMoveMapData(currentIndex);
         currentIndex += 2;
         break;
       case 'q':
@@ -225,6 +239,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs += ',,,,1,,,,,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
+        xs += getMoveMapData(currentIndex);
         currentIndex += 2;
         break;
       case 'k':
@@ -234,6 +249,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs += ',,,,,1,,,,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
+        xs += getMoveMapData(currentIndex);
         currentIndex += 2;
         break;
 
@@ -244,6 +260,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs += ',,,,,,1,,,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
+        xs += getMoveMapData(currentIndex);
         currentIndex += 2;
         break;
       case 'B':
@@ -253,6 +270,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs += ',,,,,,,1,,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
+        xs += getMoveMapData(currentIndex);
         currentIndex += 2;
         break;
       case 'N':
@@ -262,6 +280,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs += ',,,,,,,,1,,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
+        xs += getMoveMapData(currentIndex);
         currentIndex += 2;
         break;
       case 'R':
@@ -271,6 +290,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs += ',,,,,,,,,1,,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
+        xs += getMoveMapData(currentIndex);
         currentIndex += 2;
         break;
       case 'Q':
@@ -280,6 +300,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs += ',,,,,,,,,,1,,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
+        xs += getMoveMapData(currentIndex);
         currentIndex += 2;
         break;
       case 'K':
@@ -289,6 +310,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
         // xs += ',,,,,,,,,,,1,';
         xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
         xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
+        xs += getMoveMapData(currentIndex);
         currentIndex += 2;
         break;
 
@@ -304,6 +326,7 @@ const getXsAsString = ({ fens, lmt, lmf }) => {
           // xs += ',,,,,,,,,,,,';
           xs += getLmValActualStrIndex(lmf, currentIndex) + ',';
           xs += getLmValActualStrIndex(lmt, currentIndex) + ',';
+          xs += getMoveMapData(currentIndex);
           currentIndex += 2;
         }
     }

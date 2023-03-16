@@ -9,6 +9,8 @@ export const getRandomizedFilelist = async (dir, isSubCall) => {
 
   let i = list.length;
   while (i--) {
+    if (list[i] === '.DS_Store') continue;
+
     const file = path.resolve(dir, list[i]);
     const stat = await fs.stat(file);
 
