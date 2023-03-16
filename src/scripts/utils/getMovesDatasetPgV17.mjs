@@ -1851,7 +1851,7 @@ const datasetFolder = path.resolve('./data/gz_3100all_2900win_v1/default');
 // const inUnits = 14;
 const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
 
-const recordsPerDataset = 25000;
+const recordsPerDataset = 50000;
 const testRecordsPerDataset = 20000;
 
 const getGroups = async ({ datasetFolder, groupTransformer }) => {
@@ -2176,13 +2176,6 @@ const getDatasetReader = async ({
         { xs: [], ys: [] },
       );
 
-      console.log(`  - done in ${Date.now() - started} ms.`);
-    }
-
-    if (format === 'csv') {
-      process.stdout.write('joining csv lines..');
-      started = Date.now();
-      data = data.join('\n');
       console.log(`  - done in ${Date.now() - started} ms.`);
     }
 

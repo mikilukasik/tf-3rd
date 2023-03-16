@@ -108,9 +108,24 @@ export const serveDataset = async (app) => {
         const reader = await getDatasetReader(id, filterName, readerVersion);
         const batch = await reader.getNextBatch({ format, ysformat, xsformat });
         reader.metadata.samplesServed =
-          (reader.metadata.samplesServed || 0) + (format === 'csv' ? batch.split('\n') : batch.xs).length;
+          (reader.metadata.samplesServed || 0) + (format === 'csv' ? batch : batch.xs).length;
 
-        res[format === 'csv' ? 'send' : 'json'](batch);
+        if (format === 'csv') {
+          process.stdout.write('joining and sending csv lines..');
+          const started = Date.now();
+
+          while (batch.length) {
+            const shard = batch.splice(-1000);
+            res.write(shard.join('\n') + '\n');
+          }
+
+          res.end();
+          console.log(`  - done in ${Date.now() - started} ms.`);
+
+          return;
+        }
+
+        res.json(batch);
       } catch (e) {
         console.error(e);
         res.status(500).send(e.message + e.stack);
