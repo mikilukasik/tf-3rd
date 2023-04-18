@@ -2,11 +2,11 @@
   "name": "2nd",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack",
-    "dev": "webpack -w & nodemon server.mjs"
+    "dev": "webpack -w & nodemon server.mjs",
+    "chss-lite:dev": "webpack -w -c chss-lite.webpack.config.js --stats-error-details"
   },
   "keywords": [],
   "author": "",

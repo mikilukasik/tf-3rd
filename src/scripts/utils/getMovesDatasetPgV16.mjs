@@ -2086,6 +2086,10 @@ const getDatasetReader = async ({
             2,
           )},${onehot_map[ohMove][2] ? 1 : 0}`; //
         }
+      : ysformat === 'winner'
+      ? (record) => {
+          return `${getXs({ fens: [record[0]], lmf: record[8], lmt: record[9] })},${record[4] === '1' ? 1 : 0}`;
+        }
       : (record) => {
           return `${getXs({ fens: [record[0]], lmf: record[8], lmt: record[9] })},${
             record[1] === '' ? 1836 : Number(record[1])
@@ -2159,7 +2163,7 @@ const getDatasetReader = async ({
     if (format === 'csv') {
       process.stdout.write('joining csv lines..');
       started = Date.now();
-      data = data.join('\n');
+      // data = data.join('\n');
       console.log(`  - done in ${Date.now() - started} ms.`);
     }
 

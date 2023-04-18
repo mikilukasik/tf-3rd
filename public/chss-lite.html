@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      .board {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        grid-gap: 0;
+        width: 640px;
+        height: 640px;
+      }
+      .square {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 80px;
+        height: 80px;
+        font-size: 64px;
+        position: relative;
+      }
+      .movemap-display {
+        position: absolute;
+        left: 0;
+        z-index: 1;
+        opacity: 0.5;
+        font-size: 20px;
+      }
+      .white {
+        background-color: #f0d9b5;
+      }
+      .black {
+        background-color: #b58863;
+      }
+    </style>
+  </head>
+  <body>
+    <input type="text" id="fen-input" placeholder="Enter FEN" />
+    <input type="checkbox" id="movemap-checkbox" />
+    <label for="movemap-checkbox">Display move-map</label>
+    <div class="board" id="board"></div>
+
+    <script src="../dist/chss-lite.js"></script>
+  </body>
+</html>

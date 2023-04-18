@@ -10,6 +10,9 @@ const datasetReaderVersions = {
 import compression from 'compression';
 
 const filters = {
+  winner: (data) => {
+    return data[4] !== '0';
+  },
   default: (data) => {
     // fen,
     // onehot_move,
@@ -105,6 +108,8 @@ export const serveDataset = async (app) => {
     ) => {
       console.log(1, { ysformat, xsformat });
       try {
+        console.log({ filterName });
+
         const reader = await getDatasetReader(id, filterName, readerVersion);
         const batch = await reader.getNextBatch({ format, ysformat, xsformat });
         reader.metadata.samplesServed =

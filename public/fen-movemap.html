@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      .board {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        grid-gap: 0;
+        width: 640px;
+        height: 640px;
+      }
+      .square {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 80px;
+        height: 80px;
+        font-size: 64px;
+      }
+      .white {
+        background-color: #f0d9b5;
+      }
+      .black {
+        background-color: #b58863;
+      }
+    </style>
+  </head>
+  <body>
+    </div><input type="text" id="fen-input" placeholder="Enter FEN" />
+    <!-- </div><input type="text" id="movemap-input" placeholder="Enter move map data" /> -->
+    <div class="board" id="board"></div>
+
+    <script>
+      const fenInput = document.getElementById('fen-input');
+      // const moveMapInput = document.getElementById('movemap-input');
+      const board = document.getElementById('board');
+
+      const pieceMap = {
+        K: '♔',
+        Q: '♕',
+        R: '♖',
+        B: '♗',
+        N: '♘',
+        P: '♙',
+        k: '♚',
+        q: '♛',
+        r: '♜',
+        b: '♝',
+        n: '♞',
+        p: '♟',
+      };
+
+      function renderBoard(fen, moveMap) {
+        board.innerHTML = '';
+        const rows = fen.split(' ')[0].split('/');
+        for (let i = 0; i < 8; i += 1) {
+          const row = rows[i];
+          let col = 0;
+          for (const char of row) {
+            if (isNaN(parseInt(char))) {
+              const square = document.createElement('div');
+              square.className = `square ${(i + col) % 2 ? 'black' : 'white'}`;
+              square.innerText = pieceMap[char] || '';
+              board.appendChild(square);
+              col += 1;
+            } else {
+              for (let j = 0; j < parseInt(char); j += 1) {
+                const square = document.createElement('div');
+                square.className = `square ${(i + col) % 2 ? 'black' : 'white'}`;
+                board.appendChild(square);
+                col += 1;
+              }
+            }
+          }
+        }
+      }
+
+      fenInput.addEventListener('input', () => {
+        renderBoard(fenInput.value, moveMapInput.value);
+      });
+
+      // moveMapInput.addEventListener('input', () => {
+      //   renderBoard(fenInput.value, moveMapInput.value);
+      // });
+
+      fenInput.value = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+      renderBoard('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1','')
+    </script>
+  </body>
+</html>
