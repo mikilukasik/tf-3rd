@@ -8,8 +8,44 @@ const datasetReaderVersions = {
 };
 
 import compression from 'compression';
-
+// 0 fen,
+// 1 onehot_move,
+// 2 hit_soon,
+// 3 hit_or_win_soon,
+// 4 chkmate_soon,
+// 5 result,
+// 6 chkmate_ending ? '1' : '',
+// 7 stall_ending ? '1' : '',
+// 8 lmf.map((val) => val.toString(16).padStart(2, '0')).join(''),
+// 9 lmt.map((val) => val.toString(16).padStart(2, '0')).join(''),
+// 10 chkmate_ending || stall_ending ? progress : '',
+// 11 chkmate_ending || stall_ending ? progress : progress * 0.8, // adjusted progress for games that were not completed
+// 12 w_rating,
+// 13 b_rating,
+// 14 min_rating_diff,
+// 15 max_rating_diff,
+// 16 nextBalance,
+// 17 nextBalanceDistance,
+//    balAhead[2],
+//    balAhead[4],
+//    balAhead[6],
+//    balAhead[8],
+//    balAhead[10],
+//    balAhead[12],
+//    balAhead[14],
+//    balAhead[16],
+//    balAhead[18],
 const filters = {
+  chkmtEnding: (data) => {
+    // console.log(data);
+    // console.log('filtyo');
+    return data[10] && data[5] !== '0';
+  },
+  chkmtOrStallEnding: (data) => {
+    // console.log(data);
+    // console.log('filtyo');
+    return data[10] !== '';
+  },
   winner: (data) => {
     return data[4] !== '0';
   },
@@ -74,6 +110,7 @@ const datasetReaders = {};
 
 const getDatasetReader = async (optionalId, filterName = '2900', readerVersion = '17') => {
   if (optionalId && datasetReaders[optionalId]) return datasetReaders[optionalId];
+  console.log({ filterName });
 
   const reader = await datasetReaderVersions[readerVersion]({
     filter: filters[filterName],
@@ -118,6 +155,8 @@ export const serveDataset = async (app) => {
         if (format === 'csv') {
           process.stdout.write('joining and sending csv lines..');
           const started = Date.now();
+
+          // console.log(batch[0]);
 
           while (batch.length) {
             const shard = batch.splice(-1000);

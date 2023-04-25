@@ -64,7 +64,7 @@ const mirrorLmfLmtOnX = (lmx) => {
 };
 
 const mirrorOnX = (record) => {
-  const { fen, movestr, wnext_move_indexes, onehot_move, lmf, lmt, moveMap } = record;
+  const { fen, movestr, wnext_move_indexes, onehot_move, lmf, lmt } = record;
 
   const [board, ...restOfFen] = fen.split(' ');
   const newBoard = board.split('/').map(rowReverser).join('/');
@@ -72,7 +72,7 @@ const mirrorOnX = (record) => {
 
   const newLmf = mirrorLmfLmtOnX(lmf);
   const newLmt = mirrorLmfLmtOnX(lmt);
-  const newMoveMap = mirrorLmfLmtOnX(moveMap);
+  // const newMoveMap = mirrorLmfLmtOnX(moveMap);
 
   if (!movestr || movestr === 'resign')
     return {
@@ -83,7 +83,7 @@ const mirrorOnX = (record) => {
       wnext_move_indexes,
       lmf: newLmf,
       lmt: newLmt,
-      moveMap: newMoveMap,
+      // moveMap: newMoveMap,
       version: 1,
     };
 
@@ -186,7 +186,7 @@ const rotateMoveStr = ({ movestr, onehot_move }) => {
 };
 
 const rotate90 = (record) => {
-  const { fen, movestr, wnext_move_indexes, lmf, lmt, onehot_move, moveMap } = record;
+  const { fen, movestr, wnext_move_indexes, lmf, lmt, onehot_move } = record;
 
   const needsRotatedMoves = movestr && movestr !== 'resign';
 
@@ -195,7 +195,7 @@ const rotate90 = (record) => {
     fen: rotateFen(fen),
     lmf: rotateFlatArray(lmf),
     lmt: rotateFlatArray(lmt),
-    moveMap: rotateFlatArray(moveMap),
+    // moveMap: rotateFlatArray(moveMap),
     wnext_move_indexes: needsRotatedMoves ? rotateMoveIndexes(wnext_move_indexes) : wnext_move_indexes,
     ...rotateMoveStr({ movestr, onehot_move }),
   };

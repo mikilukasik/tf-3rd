@@ -37,11 +37,25 @@ const getBalanceScore = ({ result, balancesAhead }) => {
     if (ba !== balancesAhead[i - 1]) hits_left += 1;
   });
 
+  const balAhead = smoothen(balancesAhead).map((n) => Math.round(n / 100));
+  const nextBalanceDistance = Math.max(
+    balAhead.findIndex((b) => b !== balAhead[0]),
+    0,
+  );
+  const nextBalance = balAhead[nextBalanceDistance];
+
+  // console.log({ balAhead, balancesAhead });
+
+  // console.log(balAhead.join(','));
+
   return {
     hits_left,
     hit_or_win_soon: reduceAndDivideBalanceArray(smoothen(hitOrWinArray)),
     hit_soon: reduceAndDivideBalanceArray(smoothen(hitSoonArray)),
     chkmate_soon: reduceAndDivideBalanceArray(smoothen(chkMtSoonArr)),
+    balAhead, //: balancesAhead,
+    nextBalance,
+    nextBalanceDistance,
   };
 };
 

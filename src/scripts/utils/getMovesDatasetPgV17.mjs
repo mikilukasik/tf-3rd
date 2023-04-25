@@ -1846,12 +1846,12 @@ const onehot_map = [
   [0, 0, ''],
 ];
 
-const datasetFolder = path.resolve('./data/gz_3100all_2900win_v1/default');
+const datasetFolder = path.resolve('./data/gz_v6/default');
 
 // const inUnits = 14;
 const outUnits = 1837; // 1792 moves where queen promotion is default. 44 knight promotion moves + 1 resign
 
-const recordsPerDataset = 50000;
+const recordsPerDataset = 100000;
 const testRecordsPerDataset = 20000;
 
 const getGroups = async ({ datasetFolder, groupTransformer }) => {
@@ -2044,7 +2044,7 @@ const getDatasetReader = async ({
   xsformat: defaultXsformat = 'default',
   readerMeta,
 }) => {
-  console.log('creating new reader... ', { readerMeta });
+  console.log('creating new reader... ', { readerMeta }, filter);
 
   if (!sessionId) throw new Error('missing session id in datasetreader');
 
@@ -2063,28 +2063,40 @@ const getDatasetReader = async ({
   let fensInLastTestBatch = {};
 
   const transformRecord = (record) => {
-    // fen,
-    // onehot_move,
-    // hit_soon,
-    // chkmate_soon,
-    // result,
-    // chkmate_ending ? '1' : '',
-    // stall_ending ? '1' : '',
-    // is_last ? '1' : '',
-    // lmf.map((val) => val.toString(16).padStart(2, '0')).join(''),
-    // lmt.map((val) => val.toString(16).padStart(2, '0')).join(''),
-    // chkmate_ending || stall_ending ? progress : '',
-    // chkmate_ending || stall_ending ? '' : progress * 0.8, // adjusted progress for games that were not completed
-    // w_rating,
-    // b_rating,
-    // min_rating_diff,
-    // max_rating_diff,
-
-    // console.log({ record });
+    // 0 fen,
+    // 1 onehot_move,
+    // 2 hit_soon,
+    // 3   hit_or_win_soon,
+    // 4   chkmate_soon,
+    // 5   result,
+    // 6   chkmate_ending ? '1' : '',
+    // 7   stall_ending ? '1' : '',
+    // 8   lmf.map((val) => val.toString(16).padStart(2, '0')).join(''),
+    // 9   lmt.map((val) => val.toString(16).padStart(2, '0')).join(''),
+    // 10   chkmate_ending || stall_ending ? progress : '',
+    // 11   chkmate_ending || stall_ending ? progress : progress * 0.8, // adjusted progress for games that were not completed
+    // 12   w_rating,
+    // 13   b_rating,
+    // 14   min_rating_diff,
+    // 15   max_rating_diff,
+    // 16   nextBalance,
+    // 17   nextBalanceDistance,
+    // 18   balAhead[2],
+    // 19   balAhead[4],
+    // 20   balAhead[6],
+    // 21   balAhead[8],
+    // 22   balAhead[10],
+    // 23   balAhead[12],
+    // 24   balAhead[14],
+    // 25   balAhead[16],
+    // 26   balAhead[18],
 
     const xs = getXs({ fens: [record[0]], lmf: record[8], lmt: record[9] });
+
     const ys = new Array(outUnits).fill(0);
     ys[record[1] === '' ? 1836 : Number(record[1])] = 1;
+
+    // const ys = [996699669966];
 
     return { xs, ys };
   };
@@ -2108,9 +2120,16 @@ const getDatasetReader = async ({
             moveMap: record[16],
           })},${ohMove},${onehot_map[ohMove].slice(0, 2)},${onehot_map[ohMove][2] ? 1 : 0}`; //
         }
+      : ysformat === 'nextBalance'
+      ? (record) => {
+          // console.log(Number(record[11]), Number(record[5]));
+          // console.log(Number(record[16]));
+          return `${getXs({ fens: [record[0]], lmf: record[8], lmt: record[9], xsformat })},${Number(record[16])}`;
+        }
       : (record) => {
-          return `${getXs({ fens: [record[0]], lmf: record[8], lmt: record[9], xsformat, moveMap: record[16] })},${
-            record[1] === '' ? 1836 : Number(record[1])
+          // console.log(Number(record[11]), Number(record[5]));
+          return `${getXs({ fens: [record[0]], lmf: record[8], lmt: record[9], xsformat })},${
+            Number(record[11]) * Number(record[5])
           }`;
         });
 
