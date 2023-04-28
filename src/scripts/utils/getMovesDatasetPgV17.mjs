@@ -2124,7 +2124,22 @@ const getDatasetReader = async ({
       ? (record) => {
           // console.log(Number(record[11]), Number(record[5]));
           // console.log(Number(record[16]));
+          // console.log({ a: record[21] });
           return `${getXs({ fens: [record[0]], lmf: record[8], lmt: record[9], xsformat })},${Number(record[16])}`;
+        }
+      : ysformat === 'bal8'
+      ? (record) => {
+          // console.log(Number(record[11]), Number(record[5]));
+          // console.log(Number(record[16]));
+          const balAsStr = record[21];
+          if (balAsStr) return `${getXs({ fens: [record[0]], lmf: record[8], lmt: record[9], xsformat })},${balAsStr}`;
+
+          const lastBalStr = record[20] || record[19] || record[18] || record[16];
+          if (!lastBalStr) throw new Error(`no lastbal ${JSON.stringify(record)}`);
+
+          return `${getXs({ fens: [record[0]], lmf: record[8], lmt: record[9], xsformat })},${
+            Number(lastBalStr) + 20 * Number(record[5])
+          }`;
         }
       : (record) => {
           // console.log(Number(record[11]), Number(record[5]));

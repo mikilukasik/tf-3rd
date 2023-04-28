@@ -46,6 +46,9 @@ const filters = {
     // console.log('filtyo');
     return data[10] !== '';
   },
+  chkmtOrStallEndingOrHasBal8: (data) => {
+    return data[10] !== '' || data[21];
+  },
   winner: (data) => {
     return data[4] !== '0';
   },

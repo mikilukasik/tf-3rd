@@ -18,7 +18,7 @@ const reduceAndDivideBalanceArray = (arr) => arr.slice(2).reduce((p, c, i) => p 
 // const chkMtSoonArr = Array(balancesAhead.length).fill(0).concat(Array(16).fill(balanceFiller));
 // const smootherChkMtSoonArr = smoothen(chkMtSoonArr);
 
-const getBalanceScore = ({ result, balancesAhead }) => {
+const getBalanceScore = ({ result, balancesAhead, chkmate_ending, stall_ending }) => {
   const balanceDiffsAhead = balancesAhead.concat(result === 0 ? [0] : []).map((bal) => bal - balancesAhead[0]);
 
   const lastVal = balanceDiffsAhead[balanceDiffsAhead.length - 1];
@@ -37,7 +37,14 @@ const getBalanceScore = ({ result, balancesAhead }) => {
     if (ba !== balancesAhead[i - 1]) hits_left += 1;
   });
 
-  const balAhead = smoothen(balancesAhead).map((n) => Math.round(n / 100));
+  const balAhead = smoothen(balancesAhead)
+    .map((n) => Math.round(n / 100))
+    .concat(
+      chkmate_ending || stall_ending
+        ? new Array(20).fill(balancesAhead[balancesAhead.length - 1] + 20 * Number(result))
+        : [],
+    );
+
   const nextBalanceDistance = Math.max(
     balAhead.findIndex((b) => b !== balAhead[0]),
     0,
@@ -61,5 +68,5 @@ const getBalanceScore = ({ result, balancesAhead }) => {
 
 export const addHitChkmtSoon = (record) => ({
   ...record,
-  ...getBalanceScore({ result: record.wNextResult, balancesAhead: record.wNextBalancesAhead }),
+  ...getBalanceScore({ ...record, result: record.wNextResult, balancesAhead: record.wNextBalancesAhead }),
 });
