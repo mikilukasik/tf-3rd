@@ -18,7 +18,7 @@ const reduceAndDivideBalanceArray = (arr) => arr.slice(2).reduce((p, c, i) => p 
 // const chkMtSoonArr = Array(balancesAhead.length).fill(0).concat(Array(16).fill(balanceFiller));
 // const smootherChkMtSoonArr = smoothen(chkMtSoonArr);
 
-const getBalanceScore = ({ result, balancesAhead, chkmate_ending, stall_ending }) => {
+const getBalanceScore = ({ result, balancesAhead, chkmate_ending, stall_ending, move_index, total_moves }) => {
   const balanceDiffsAhead = balancesAhead.concat(result === 0 ? [0] : []).map((bal) => bal - balancesAhead[0]);
 
   const lastVal = balanceDiffsAhead[balanceDiffsAhead.length - 1];
@@ -37,19 +37,22 @@ const getBalanceScore = ({ result, balancesAhead, chkmate_ending, stall_ending }
     if (ba !== balancesAhead[i - 1]) hits_left += 1;
   });
 
-  const balAhead = smoothen(balancesAhead)
-    .map((n) => Math.round(n / 100))
-    .concat(
-      chkmate_ending || stall_ending
-        ? new Array(20).fill(balancesAhead[balancesAhead.length - 1] + 20 * Number(result))
-        : [],
-    );
+  // const smallBalAhead = balancesAhead.map((n) => Math.round(n / 100));
 
-  const nextBalanceDistance = Math.max(
-    balAhead.findIndex((b) => b !== balAhead[0]),
-    0,
+  const extendedSBalAhead = balancesAhead.concat(
+    chkmate_ending || stall_ending
+      ? new Array(20).fill(stall_ending ? 0 : balancesAhead[balancesAhead.length - 1] + 1500 * Number(result))
+      : [],
   );
-  const nextBalance = balAhead[nextBalanceDistance];
+
+  const balAhead = smoothen(extendedSBalAhead).map((n) => Math.round(n / 100));
+
+  const nextBalanceDistance = balAhead.findIndex((b) => b !== balAhead[0]);
+
+  const nextBalance = nextBalanceDistance === -1 ? '' : balAhead[nextBalanceDistance];
+
+  // if (chkmate_ending && move_index / total_moves > 0.97)
+  //   console.log({ balancesAhead, extendedSBalAhead, balAhead, nextBalanceDistance, nextBalance });
 
   // console.log({ balAhead, balancesAhead });
 

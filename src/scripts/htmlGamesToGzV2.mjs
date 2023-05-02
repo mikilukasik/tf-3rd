@@ -12,9 +12,9 @@ import { shuffle } from '../../chss-module-engine/src/utils/schuffle.js';
 
 const BATCH_SIZE = 100;
 const parentFolder = 'data/new_html';
-const recordsFolder = 'data/gz_v6';
+const recordsFolder = 'data/gz_v8';
 
-const progressGroupCount = 4;
+const progressGroupCount = 3;
 
 let filesSkipped = 0;
 let fensSkipped = 0;
@@ -231,6 +231,7 @@ const {
         max_rating_diff,
         nextBalance,
         nextBalanceDistance,
+        balAhead[0],
         balAhead[2],
         balAhead[4],
         balAhead[6],
