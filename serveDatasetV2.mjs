@@ -64,14 +64,26 @@ const filters = {
   //         (data[4] === '1' || Number(data[2]) > 0))) // won or is taking next piece
   //   );
   // },
-  // 2900: (data) => {
-  //   return (
-  //     data[1] && // got move
-  //     data[1] !== '1836' && // not mate/stall/resigh/abort
-  //     (Number(data[12]) >= 3000 || // 3000+ we learn all their moves
-  //       (Number(data[12]) >= 2900 && data[4] === '1')) // 2900 + AND winning
-  //   );
-  // },
+  2700: (data) => {
+    return (
+      data[1] && // got move
+      data[1] !== '1836' && // not mate/stall/resigh/abort
+      (Number(data[12]) >= 2900 || // 2900+ we learn all their moves
+        ((Number(data[12]) >= 2800 || Number(data[13]) >= 2800) &&
+          (data[4] === '1' || Number(data[16]) > Number(data[18]))) || // 2800+ winning or going to hit
+        ((Number(data[12]) >= 2700 || Number(data[13]) >= 2700) &&
+          data[4] === '1' &&
+          Number(data[16]) > Number(data[18]))) // // 2700+ winning and going to hit
+    );
+  },
+  2900: (data) => {
+    return (
+      data[1] && // got move
+      data[1] !== '1836' && // not mate/stall/resigh/abort
+      (Number(data[12]) >= 3000 || // 3000+ we learn all their moves
+        (Number(data[12]) >= 2900 && data[4] === '1')) // 2900 + AND winning
+    );
+  },
   hasAnyNextBal: (data) => Number(data[17]) >= 0,
 };
 
