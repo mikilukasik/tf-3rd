@@ -70,10 +70,26 @@ const filters = {
       data[1] !== '1836' && // not mate/stall/resigh/abort
       (Number(data[12]) >= 2900 || // 2900+ we learn all their moves
         ((Number(data[12]) >= 2800 || Number(data[13]) >= 2800) &&
-          (data[4] === '1' || Number(data[16]) > Number(data[18]))) || // 2800+ winning or going to hit
+          (data[5] === '1' || Number(data[16]) > Number(data[18]))) || // 2800+ winning or going to hit
         ((Number(data[12]) >= 2700 || Number(data[13]) >= 2700) &&
-          data[4] === '1' &&
+          data[5] === '1' &&
           Number(data[16]) > Number(data[18]))) // // 2700+ winning and going to hit
+    );
+  },
+  almostall: (data) => {
+    return (
+      data[1] && // got move
+      data[1] !== '1836'
+    );
+  },
+  mostlyGood: (data) => {
+    // logic: all 2700+ games, 2400+ games where we are winning or going to hit, 50% of rest
+    return (
+      data[1] && // got move
+      data[1] !== '1836' && // not mate/stall/resigh/abort
+      (Number(data[12]) >= 2700 || // 2700+ we learn all their moves
+        (Number(data[12]) >= 2400 && (data[5] === '1' || Number(data[16]) > Number(data[18]))) || // 2500+ winning or going to hit
+        Math.random() < 0.5)
     );
   },
   2900: (data) => {
@@ -81,10 +97,75 @@ const filters = {
       data[1] && // got move
       data[1] !== '1836' && // not mate/stall/resigh/abort
       (Number(data[12]) >= 3000 || // 3000+ we learn all their moves
-        (Number(data[12]) >= 2900 && data[4] === '1')) // 2900 + AND winning
+        (Number(data[12]) >= 2900 && data[5] === '1')) // 2900 + AND winning
     );
   },
   hasAnyNextBal: (data) => Number(data[17]) >= 0,
+};
+
+const parseFilterObj = (inputStr) => {
+  const regex = /\(([^)]+)\)/g;
+  const results = [];
+
+  let match;
+  while ((match = regex.exec(inputStr)) !== null) {
+    const properties = match[1].split(',').reduce((acc, property) => {
+      const [key, value] = property.split(':');
+      acc[key] = value;
+      // acc[key] = isNaN(value) ? value : parseFloat(value);
+      return acc;
+    }, {});
+
+    results.push(properties);
+  }
+
+  return results;
+};
+
+const matchesFilters = (data, filterObjs) => {
+  for (const filterObj of filterObjs) {
+    let allKeysMatch = true;
+
+    for (const key of Object.keys(filterObj)) {
+      switch (key) {
+        case 'result':
+          if (data[5] !== filterObj[key]) {
+            allKeysMatch = false;
+          }
+          break;
+
+        case 'progressMax':
+          if (Number(data[11]) > Number(filterObj[key])) {
+            allKeysMatch = false;
+          }
+          break;
+
+        case 'opponentMinElo':
+          if (!data[13] || Number(data[13]) < Number(filterObj[key])) {
+            allKeysMatch = false;
+          }
+          break;
+
+        case 'percent':
+          if (Math.random() > Number(filterObj[key])) {
+            allKeysMatch = false;
+          }
+          break;
+
+        default:
+          throw new Error(`Unknown filter key ${key}`);
+      }
+
+      // If one key doesn't match, break out of this loop and move on to the next filterObj.
+      if (!allKeysMatch) break;
+    }
+
+    // If all keys for this filterObj matched, return true.
+    if (allKeysMatch) return true;
+  }
+
+  // If none of the filterObjs matched in their entirety, return false.
+  return false;
 };
 
 const getFilter = (filterName) => {
@@ -97,9 +178,21 @@ const getFilter = (filterName) => {
       return nextBalanceDistance >= 0 && nextBalanceDistance <= nextBalIndex;
     };
   }
+
+  if (filterName && filterName.startsWith('obj(')) {
+    // example filtername is 'obj(result:1,progressMax:0.2,opponentMinElo:2500)(result:1,progressMax:0.2,percent:0.3)'
+
+    const filterObjs = parseFilterObj(filterName);
+    return (data) => matchesFilters(data, filterObjs);
+  }
+
+  throw new Error(`Unknown filter ${filterName}`);
 };
 
-const groupTransformer = (groups) => groups;
+const groupTransformer = (groups) => {
+  console.log(groups);
+  return [groups[0]];
+};
 
 const datasetReaders = {};
 

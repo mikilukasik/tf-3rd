@@ -98,7 +98,7 @@ const readFromGroup = async ({
   randomFileOrder,
   // fileList,
 }) => {
-  console.log('------', Object.keys(fensInLastTestBatch).sort()[0]);
+  // console.log('------', Object.keys(fensInLastTestBatch).sort()[0]);
 
   const result = [];
   if (!take) return result;
@@ -399,7 +399,10 @@ const getDatasetReader = async ({
           // }`;
         }
       : (record) => {
-          // console.log(Number(record[11]), Number(record[5]));
+          // log one record per thousand
+          // if (Math.random() > 0.999) console.log({ record });
+
+          // console.log(Number(record[16]));
           return `${getXs({ fens: [record[0]], lmf: record[8], lmt: record[9], xsformat })},${Number(record[1])}`;
         });
 
